@@ -1,6 +1,5 @@
 out
 build
-*.bin
 *.cxi
 *.o
 *.d
