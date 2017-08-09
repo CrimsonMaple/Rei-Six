@@ -4,6 +4,6 @@
 
 #pragma once
 
-#include "common.h"
+#include "types.h"
 
 void ioDelay(u32 us);

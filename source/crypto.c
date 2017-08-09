@@ -1,4 +1,5 @@
-// From http://github.com/b1l1s/ctr
+// 3ds crypto lib from: http://github.com/b1l1s/ctr
+// CTRNAND code from: https://github.com/AuroraWright/Luma3ds
 
 #include "crypto.h"
 
@@ -6,6 +7,7 @@
 #include "memory.h"
 #include "fatfs/sdmmc/sdmmc.h"
 #include "fatfs/ff.h"
+#include "fmt.h"
 
 /****************************************************************
 *                   Crypto Libs
@@ -226,6 +228,50 @@ void aes(void* dst, const void* src, u32 blockCount, void* iv, u32 mode, u32 ivM
 	}
 }
 
+static void sha_wait_idle()
+{
+    while(*REG_SHA_CNT & 1);
+}
+
+void sha(void *res, const void *src, u32 size, u32 mode)
+{
+    sha_wait_idle();
+    *REG_SHA_CNT = mode | SHA_CNT_OUTPUT_ENDIAN | SHA_NORMAL_ROUND;
+
+    const u32 *src32 = (const u32 *)src;
+    int i;
+    while(size >= 0x40)
+    {
+        sha_wait_idle();
+        for(i = 0; i < 4; ++i)
+        {
+            *REG_SHA_INFIFO = *src32++;
+            *REG_SHA_INFIFO = *src32++;
+            *REG_SHA_INFIFO = *src32++;
+            *REG_SHA_INFIFO = *src32++;
+        }
+
+        size -= 0x40;
+    }
+
+    sha_wait_idle();
+    memcpy((void *)REG_SHA_INFIFO, src32, size);
+
+    *REG_SHA_CNT = (*REG_SHA_CNT & ~SHA_NORMAL_ROUND) | SHA_FINAL_ROUND;
+
+    while(*REG_SHA_CNT & SHA_FINAL_ROUND);
+    sha_wait_idle();
+
+    u32 hashSize = SHA_256_HASH_SIZE;
+    if(mode == SHA_224_MODE)
+        hashSize = SHA_224_HASH_SIZE;
+    else if(mode == SHA_1_MODE)
+        hashSize = SHA_1_HASH_SIZE;
+
+    memcpy(res, (void *)REG_SHA_HASH, hashSize);
+}
+
+
 void xor(u8 *dest, const u8 *data1, const u8 *data2, Size size){
     u32 i; for(i = 0; i < size; i++) *((u8*)dest+i) = *((u8*)data1+i) ^ *((u8*)data2+i);
 }
@@ -233,66 +279,142 @@ void xor(u8 *dest, const u8 *data1, const u8 *data2, Size size){
 /****************************************************************
 *                   Nand/FIRM Crypto stuff
 ****************************************************************/
+ALIGNED(4) static u8 nandCtr[AES_BLOCK_SIZE];
+static u8 nandSlot;
+static u32 fatStart;
 
-const u8 memeKey[0x10] = {
+int nandInit(void){
+    ALIGNED(4) u8 cid[AES_BLOCK_SIZE],
+               shaSum[SHA_256_HASH_SIZE];
+    
+    sdmmc_get_cid(1, (u32*)cid);
+    sha(shaSum, cid, AES_BLOCK_SIZE, SHA_256_MODE);
+    memcpy(nandCtr, shaSum, sizeof(nandCtr));
+    
+    if(ISN3DS){ fatStart = 0x5CAD7; nandSlot = 0x05; } else { fatStart = 0x5CAE5; nandSlot = 0x04; }
+    
+    return 1;
+}
+
+u32 nandRead(u32 sector, u32 sectorCount, u8 *buffer){ //Only Reads from the Physical Nand for simplicity.
+    u32 result;
+    ALIGNED(4) u8 tmpCtr[AES_BLOCK_SIZE]; //Set variable for result and copy nandCtr to a Temp variable.
+    
+    memcpy(tmpCtr, nandCtr, sizeof(nandCtr)); //copy nandCtr to tmpCtr
+    aes_advctr(tmpCtr, ((sector + fatStart) * 0x200) / AES_BLOCK_SIZE, AES_INPUT_BE | AES_INPUT_NORMAL);
+    
+    result = sdmmc_nand_readsectors(sector + fatStart, sectorCount, buffer);
+    aes_use_keyslot(nandSlot);
+    aes(buffer, buffer, (sectorCount * 0x200) / AES_BLOCK_SIZE, tmpCtr, AES_CTR_MODE, AES_INPUT_BE | AES_INPUT_NORMAL);
+    
+    return result;
+}
+
+bool decryptExeFs(Cxi *cxi){
+    if(memcmp(cxi->ncch.magic, "NCCH", 4) != 0) 
+        return false;
+    
+    u8 *exeFsOffset = (u8*)cxi + 6 * 0x200;
+    u32 exeFsSize = (cxi->ncch.exeFsSize - 1) * 0x200;
+    __attribute__((aligned(4))) u8 ncchCtr[AES_BLOCK_SIZE] = {0};
+    
+    for(u32 i = 0; i < 8; i++)
+        ncchCtr[7 - i] = cxi->ncch.partitionId[i];
+    
+    ncchCtr[8] = 2;
+    aes_setkey(0x2C, cxi, AES_KEYY, AES_INPUT_BE | AES_INPUT_NORMAL);
+    aes_advctr(ncchCtr, 0x200 / AES_BLOCK_SIZE, AES_INPUT_BE | AES_INPUT_NORMAL);
+    aes_use_keyslot(0x2C);
+    aes(cxi, exeFsOffset, exeFsSize / AES_BLOCK_SIZE, ncchCtr, AES_CTR_MODE, AES_INPUT_BE | AES_INPUT_NORMAL);
+    
+    return memcmp(cxi, "FIRM", 4) == 0;
+}
+
+const u8 memeKey[0x10] = { //Megumin best girl, fite me Rei.
     0x52, 0x65, 0x69, 0x20, 0x69, 0x73, 0x20, 0x62, 0x65, 0x73, 0x74, 0x20, 0x67, 0x69, 0x72, 0x6C
 };
 
+void initKeyslot11(void){
+    ALIGNED(4) static u8 shasum[SHA_256_HASH_SIZE];
+    sha(shasum, (void *)0x10012000, 0x90, SHA_256_MODE);
+
+    aes_setkey(0x11, shasum, AES_KEYX, AES_INPUT_BE | AES_INPUT_NORMAL);
+    aes_setkey(0x11, shasum + AES_BLOCK_SIZE, AES_KEYY, AES_INPUT_BE | AES_INPUT_NORMAL);
+}
+
 //Emulates the K9L process and then some
-void k9loader(void *armHdr){
-    //If old3ds, skip n3ds parts
-    if(PDN_MPCORE_CFG == 1) goto Legacy;
+void k9loader(Arm9Bin* sect_arm9){
+    u32 k9lVer = 0;
     
-    //Nand key#2 (0x12C10)
-    u8 key2[0x10] = {
-        0x42, 0x3F, 0x81, 0x7A, 0x23, 0x52, 0x58, 0x31, 0x6E, 0x75, 0x8E, 0x3A, 0x39, 0x43, 0x2E, 0xD0
-    };
-  
-    //Firm keys
-    u8 keyX[0x10];
-    u8 keyY[0x10];
-    u8 CTR[0x10];
-    u32 slot = 0x16;
+    ALIGNED(4) u8 key1[AES_BLOCK_SIZE];
+    ALIGNED(4) u8 key2[AES_BLOCK_SIZE];
     
-    //Setup keys needed for arm9bin decryption
-    //xor(key2, key2, memeKey, 0x10);
-    memcpy(keyY, (void*)(armHdr+0x10), 0x10);
-    memcpy(CTR, (void*)(armHdr+0x20), 0x10);
-    u32 size = atoi((void*)(armHdr+0x30));
+    sdmmc_sdcard_init();
 
-    //Set 0x11 to key2 for the arm9bin and misc keys
-    aes_setkey(0x11, key2, AES_KEYNORMAL, AES_INPUT_BE | AES_INPUT_NORMAL);
-    aes_use_keyslot(0x11);
-    
-    //Set 0x16 keyX, keyY and CTR
-    aes((void*)keyX, (void*)(armHdr+0x60), 1, NULL, AES_ECB_DECRYPT_MODE, 0);
-    aes_setkey(slot, keyX, AES_KEYX, AES_INPUT_BE | AES_INPUT_NORMAL);
-    aes_setkey(slot, keyY, AES_KEYY, AES_INPUT_BE | AES_INPUT_NORMAL);
-    aes_setiv(CTR, AES_INPUT_BE | AES_INPUT_NORMAL);
-    aes_use_keyslot(slot);
-    
-    //Decrypt arm9bin
-    aes((void*)(armHdr+0x800), (void*)(armHdr+0x800), size/AES_BLOCK_SIZE, CTR, AES_CTR_MODE, AES_INPUT_BE | AES_INPUT_NORMAL);
+	switch (sect_arm9->magic[3])
+	{
+		case 0xFF:
+			k9lVer = 0;
+			break;
+		case '1':
+			k9lVer = 1;
+			break;
+		default:
+			k9lVer = 2;
+			break;
+	}
 
-    //Set keys 0x19..0x1F keyXs
-    u8 miscPattern[] = {0xDD, 0xDA, 0xA4, 0xC6};
-    uPtr miscKeyOff = memsearch(armHdr, miscPattern, 0x90000, sizeof(miscPattern));
-    u8 decKey[0x10] = {0};
-    aes_use_keyslot(0x11);
-    for(slot = 0x19; slot < 0x20; slot++) {
-        aes(decKey, (void*)miscKeyOff, 1, NULL, AES_ECB_DECRYPT_MODE, 0);
-        aes_setkey(slot, decKey, AES_KEYX, AES_INPUT_BE | AES_INPUT_NORMAL);
-        *(u8*)((void*)(miscKeyOff+0xF)) += 1;
+	u32 *arm9BinStart = (u32*)((u8*)sect_arm9 + 0x800);
+    if(*arm9BinStart == 0x47704770 || *arm9BinStart == 0xB0862000)
+        return; //Already decrypted
+
+    if (ISN3DS){
+		ALIGNED(4) u8 secretSector[512]; //Secret Sector Buffer.
+
+		sdmmc_nand_readsectors(0x96, 1, secretSector); //Read Secret Sector into Buffer.
+
+        initKeyslot11(); //Init Keyslot 0x11
+        aes_use_keyslot(0x11);
+        for (u32 i = 0; i < 32; ++i) //Encrypt Key Sector
+            aes(secretSector + (AES_BLOCK_SIZE * i), secretSector + (AES_BLOCK_SIZE * i), 1, NULL, AES_ECB_DECRYPT_MODE, 0);
+        
+        //TODO: Add check for key hashes, and SHUTDOWN for errors!
+
+        //Copy keys from buffer.
+        memcpy(key1, secretSector, AES_BLOCK_SIZE);
+        memcpy(key2, secretSector + AES_BLOCK_SIZE, AES_BLOCK_SIZE);
+        memset(secretSector, 0, 512);
     }
+
+    aes_setkey(0x11, (k9lVer == 2) ? key2 : key1, AES_KEYNORMAL, AES_INPUT_BE | AES_INPUT_NORMAL);
+	memset(key1, 0, AES_BLOCK_SIZE);
+	memset(key2, 0, AES_BLOCK_SIZE);
+
+	u8 keySlot = k9lVer == 0 ? 0x15 : 0x16;
+
+	// KeyX
+	ALIGNED(4) u8 keyX[AES_BLOCK_SIZE];
+	aes_use_keyslot(0x11);
+	aes(keyX, k9lVer == 0 ? sect_arm9->keyX : sect_arm9->slot0x16keyX, 1, NULL, AES_ECB_DECRYPT_MODE, 0);
+	aes_setkey(keySlot, keyX, AES_KEYX, AES_INPUT_BE | AES_INPUT_NORMAL);
+	memset(keyX, 0, AES_BLOCK_SIZE);
+
+	// KeyY
+	ALIGNED(4) u8 keyY[AES_BLOCK_SIZE];
+	memcpy(keyY, sect_arm9->keyY, sizeof(keyY));
+	aes_setkey(keySlot, keyY, AES_KEYY, AES_INPUT_BE | AES_INPUT_NORMAL);
+	memset(keyY, 0, AES_BLOCK_SIZE);
+
+	// CTR
+	ALIGNED(4) u8 CTR[AES_BLOCK_SIZE];
+	memcpy(CTR, sect_arm9->ctr, sizeof(CTR));
+
+	aes_use_keyslot(keySlot);
+	aes(arm9BinStart, arm9BinStart, decAtoi(sect_arm9->size, sizeof(sect_arm9->size)) / AES_BLOCK_SIZE, CTR, AES_CTR_MODE, AES_INPUT_BE | AES_INPUT_NORMAL);
+	memset(CTR, 0, AES_BLOCK_SIZE);
     
-    Legacy:;
-    //Setup legacy keys
-    u8 keyX_0x25[0x10] = {
-        0x9C, 0x82, 0xB1, 0x8B, 0x59, 0xB3, 0x2D, 0xCC, 
-        0xE0, 0x7D, 0x81, 0xC3, 0xE5, 0xC5, 0x28, 0x9F
-    };
-    xor(keyX_0x25, keyX_0x25, memeKey, 0x10);
-    aes_setkey(0x25, (u8*)keyX_0x25, AES_KEYX, AES_INPUT_BE | AES_INPUT_NORMAL);
+    if(*arm9BinStart != 0x47704770 && *arm9BinStart != 0xB0862000) //Add shutdown here instead of return.
+        return;
 }
 
 //Decrypt firmware blob

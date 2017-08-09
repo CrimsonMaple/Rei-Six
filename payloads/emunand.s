@@ -1,4 +1,4 @@
-.nds
+.arm.little
 .create "build/emunand.bin", 0
 .arm
 

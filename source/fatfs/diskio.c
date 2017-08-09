@@ -7,9 +7,13 @@
 /* storage control modules to the FatFs module with a defined API.       */
 /*-----------------------------------------------------------------------*/
 
-#include "diskio.h"		/* FatFs lower layer API */
-#include "sdmmc/sdmmc.h"
+#include "fatfs/diskio.h"		/* FatFs lower layer API */
+#include "fatfs/sdmmc/sdmmc.h"
+#include "crypto.h"
 
+/* Definitions of physical drive number for each media */
+#define SDCARD        0
+#define CTRNAND       1
 
 /*-----------------------------------------------------------------------*/
 /* Get Drive Status                                                      */
@@ -30,12 +34,15 @@ DSTATUS disk_status (
 /*-----------------------------------------------------------------------*/
 
 DSTATUS disk_initialize (
-	__attribute__((unused))
 	BYTE pdrv				/* Physical drive nmuber to identify the drive */
 )
 {
-	sdmmc_sdcard_init();
-	return RES_OK;
+static u32 sdmmcInitResult = 4;
+
+        if(sdmmcInitResult == 4) sdmmcInitResult = sdmmc_sdcard_init();
+
+	return ((pdrv == SDCARD && !(sdmmcInitResult & 2)) ||
+            (pdrv == CTRNAND && !(sdmmcInitResult & 1) && !nandInit())) ? 0 : STA_NOINIT;
 }
 
 
@@ -45,18 +52,14 @@ DSTATUS disk_initialize (
 /*-----------------------------------------------------------------------*/
 
 DRESULT disk_read (
-	__attribute__((unused))
 	BYTE pdrv,		/* Physical drive nmuber to identify the drive */
 	BYTE *buff,		/* Data buffer to store read data */
 	DWORD sector,	/* Sector address in LBA */
 	UINT count		/* Number of sectors to read */
 )
 {
-	if (sdmmc_sdcard_readsectors(sector, count, buff)) {
-		return RES_PARERR;
-	}
-
-	return RES_OK;
+        return ((pdrv == SDCARD && !sdmmc_sdcard_readsectors(sector, count, buff)) ||
+                (pdrv == CTRNAND && !nandRead(sector, count, buff))) ? RES_OK : RES_PARERR;
 }
 
 
@@ -67,9 +70,8 @@ DRESULT disk_read (
 
 #if _USE_WRITE
 DRESULT disk_write (
-	__attribute__((unused))
 	BYTE pdrv,			/* Physical drive nmuber to identify the drive */
-	const BYTE *buff,	/* Data to be written */
+	const BYTE *buff,       	/* Data to be written */
 	DWORD sector,		/* Sector address in LBA */
 	UINT count			/* Number of sectors to write */
 )
