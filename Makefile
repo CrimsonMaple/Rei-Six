@@ -1,103 +1,98 @@
-#-----------------------------------------------------------------------------------------------
- rwildcard = $(foreach d, $(wildcard $1*), $(filter $(subst *, %, $2), $d) $(call rwildcard, $d/, $2))
+rwildcard = $(foreach d, $(wildcard $1*), $(filter $(subst *, %, $2), $d) $(call rwildcard, $d/, $2))
 
- ifeq ($(strip $(DEVKITARM)),)
- $(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM")
- endif
+CC := arm-none-eabi-gcc
+AS := arm-none-eabi-as
+LD := arm-none-eabi-ld
+OC := arm-none-eabi-objcopy
 
- include $(DEVKITARM)/base_tools
+name := ReiNand
 
- name := ReiNand
+dir_source := source
+dir_data := data
+dir_build := build
+dir_haxloader := haxloader
+dir_loader := loader
+dir_out := out
+dir_payload := payloads
 
-#-----------------------------------------------------------------------------------------------
- dir_source	  := source
- dir_include  := include
- dir_common	  := common
- dir_build	  := build
- dir_loader	  := loader
- dir_out	  := out
- dir_payload  := payloads
-#-----------------------------------------------------------------------------------------------
-
-ASFLAGS := -mlittle-endian -mcpu=arm946e-s
-CFLAGS  := -Wall -Wextra $(ASFLAGS) -fno-builtin -std=c11 -Wno-main -O2 -flto -ffast-math
-CFLAGS	+= -I$(dir_include)
+ASFLAGS := -mlittle-endian -mcpu=arm946e-s -march=armv5te
+CFLAGS := -Wall -MMD -MP -O2 -marm $(ASFLAGS) -fno-builtin -fshort-wchar -std=c11 -Wno-main
+FLAGS := name=$(name).dat dir_out=$(abspath $(dir_out)) ICON=$(abspath icon.png) --no-print-directory
 
 objects_cfw = $(patsubst $(dir_source)/%.s, $(dir_build)/%.o, \
 			  $(patsubst $(dir_source)/%.c, $(dir_build)/%.o, \
 			  $(call rwildcard, $(dir_source), *.s *.c)))
-              
-payloads = $(dir_build)/emunand.bin.o $(dir_build)/reboot.bin.o
-              
-define bin2o
-	bin2s $< | $(AS) -o $(@)
-endef
-			  
-#-----------------------------------------------------------------------------------------------
 
 .PHONY: all
-all: sighax loader
+all: a9lh haxloader loader 
 
-.PHONY: sighax
-sighax: $(dir_out)/boot.firm
+.PHONY: test
+test: a9lh haxloader
+
+.PHONY: a9lh
+a9lh: $(dir_out)/arm9loaderhax.bin
 
 .PHONY: loader
 loader: $(dir_out)/rei/loader.cxi
 
+.PHONY: haxloader
+haxloader: a9lh
+	@$(MAKE) name=$(name) -C $(dir_haxloader)
+
 .PHONY: clean
 clean:
+	@$(MAKE) $(FLAGS) -C $(dir_haxloader) clean
 	@$(MAKE) $(FLAGS) -C $(dir_loader) clean
 	rm -rf $(dir_out) $(dir_build)
 
-#-----------------------------------------------------------------------------------------------
+.PHONY: $(dir_out)/arm9loaderhax.bin
+$(dir_out)/arm9loaderhax.bin: $(dir_build)/main.bin
+	@mkdir -p "$(dir_out)"
+	@cp -av $< $@
 
-PHONY: $(dir_out)/boot.firm
-$(dir_out)/boot.firm: $(dir_build)/main.elf
-	@mkdir -p "$(@D)"
-	@firmtool build $@ -e 0 -D $^ -C NDMA
-	
-#-----------------------------------------------------------------------------------------------
-
-$(dir_build)/main.elf: $(payloads) $(objects_cfw)
-	# FatFs requires libgcc for __aeabi_uidiv
-	$(CC) -nostartfiles $(LDFLAGS) -T linker.ld $(OUTPUT_OPTION) $^
-
-#-----------------------------------------------------------------------------------------------
-
-$(dir_out)/rei/: $(dir_common)/native_firmware.bin $(dir_common)/agb_firmware.bin $(dir_common)/twl_firmware.bin $(dir_common)/top_splash.bin $(dir_common)/bottom_splash.bin
+.PHONY: $(dir_out)/$(name).dat
+$(dir_out)/$(name).dat: $(dir_build)/main.bin $(dir_out)/rei/ $(dir_out)/rei/patches/patches.dat
+	@$(MAKE) $(FLAGS) -C $(dir_cakehax) launcher
+	dd if=$(dir_build)/main.bin of=$@ bs=512 seek=144
+    
+$(dir_out)/rei/: $(dir_data)/firmware.bin $(dir_data)/splashTop.bin $(dir_data)/splashBot.bin $(dir_out)/rei/patches/patches.dat
 	@mkdir -p "$(dir_out)/rei"
 	@cp -av $^ $@
 
-$(dir_out)/rei/patches/patches.dat: $(wildcard common/patches/*.rnp)
-	@mkdir -p "$(@D)"
-	cat $< > $@
+$(dir_out)/rei/patches/patches.dat: $(wildcard data/patches/*.rnp)
+	@mkdir -p "$(dir_out)/rei/patches/"
+	cat $^ > $@
 
-$(dir_out)/rei/loader.cxi: $(dir_loader) $(dir_out)/rei $(dir_out)/rei/patches/patches.dat
+$(dir_out)/rei/loader.cxi: $(dir_loader) $(dir_out)/rei/
 	@$(MAKE) $(FLAGS) -C $(dir_loader)
 	@mv $(dir_loader)/loader.cxi $(dir_out)/rei
+    
+$(dir_build)/payloads.h: $(dir_payload)/emunand.s $(dir_payload)/reboot.s
+	@mkdir $(dir_build)
+	@armips $(word 1, $^)
+	@armips $(word 2, $^)
+	@bin2c -o $@ -n emunand $(dir_build)/emunand.bin -n reboot $(dir_build)/reboot.bin
 
-$(dir_build)/%.bin: $(dir_payload)/%.s
-	@mkdir -p "$(@D)"
-	@armips $<
+$(dir_build)/main.bin: $(dir_build)/main.elf
+	$(OC) -S -O binary $< $@
 
-$(dir_build)/%.bin.o: $(dir_build)/%.bin
-	@$(bin2o)
+$(dir_build)/main.elf: $(dir_build)/payloads.h $(objects_cfw)
+	# FatFs requires libgcc for __aeabi_uidiv
+	$(CC) -nostartfiles $(LDFLAGS) -T linker.ld $(OUTPUT_OPTION) $^
 
-$(dir_build)/payloads.h: $(payloads)
-	@$(foreach f, $(payloads),\
-	echo "extern const u8" `(echo $(basename $(notdir $(f))) | sed -e 's/^\([0-9]\)/_\1/' | tr . _)`"[];" >> $@;\
-	echo "extern const u32" `(echo $(basename $(notdir $(f)))| sed -e 's/^\([0-9]\)/_\1/' | tr . _)`_size";" >> $@;\
-    )
-
-#-----------------------------------------------------------------------------------------------
-
-$(dir_build)/%.o: $(dir_source)/%.c $(dir_build)/payloads.h
+$(dir_build)/%.o: $(dir_source)/%.c
 	@mkdir -p "$(@D)"
 	$(COMPILE.c) $(OUTPUT_OPTION) $<
 
 $(dir_build)/%.o: $(dir_source)/%.s
 	@mkdir -p "$(@D)"
 	$(COMPILE.s) $(OUTPUT_OPTION) $<
-include $(call rwildcard, $(dir_build), *.d)
+    
+$(dir_build)/fatfs/%.o: $(dir_source)/fatfs/%.c
+	@mkdir -p "$(@D)"
+	$(COMPILE.c) -mthumb -mthumb-interwork -Wno-unused-function $(OUTPUT_OPTION) $<
 
-#-----------------------------------------------------------------------------------------------
+$(dir_build)/fatfs/%.o: $(dir_source)/fatfs/%.s
+	@mkdir -p "$(@D)"
+	$(COMPILE.s) -mthumb -mthumb-interwork $(OUTPUT_OPTION) $<
+include $(call rwildcard, $(dir_build), *.d)

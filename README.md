@@ -1,4 +1,4 @@
-# RenNand
+# ReiNand
 [![License (GPL version 3)](https://img.shields.io/badge/license-GNU%20GPL%20version%203-red.svg?style=flat-square)](http://opensource.org/licenses/GPL-3.0)
 
 *The original open source N3DS CFW!*
@@ -7,10 +7,10 @@
 
 **Compiling:**
 
-You'll need armips, bin2c and firmtool added to your Path. [HERE](https://reisyukaku.org/downloads/buildtools.zip) are the pre-compiled binaries for Windows.
+You'll need armips and bin2c added to your Path. [HERE](https://reisyukaku.org/downloads/buildtools.zip) are the pre-compiled binaries for Windows.
 
-    make - Compiles Everything.
-	make sighax - Compiles boot9Strap payload
+    make - Compiles All. (launcher and a9lh)
+    make a9lh - Compiles arm9loaderhax payload
 
 Copy everything in 'out' folder to SD root and run!
 
@@ -23,9 +23,7 @@ Copy everything in 'out' folder to SD root and run!
 
 * Sig checks disabled
 
-* Reboot Patch
-
-* LGY FIRM patches
+* Reboot patch
 
 * Firm partition update protection
 
@@ -37,7 +35,6 @@ Copy everything in 'out' folder to SD root and run!
     * Auto updates disabled
     * EShop update check disabled
     * RO verification disabled
-    * [TODO]: Flashcart Whitelist Patch
     * and [MORE](https://reisyukaku.org/3DS/ReiNand/patches)
 
 **Credits:**
@@ -54,9 +51,9 @@ Copy everything in 'out' folder to SD root and run!
  
  Normmatt for sdmmc.c and generally being helpful!
  
- Luma Dev Team for their AGB/TWL patches, and being generally helpful! No, Seriously.
+ AuroraWright for being helpful with better sysmod injection and stuff!
  
- MidKid and Delebile for the reboot code.
+ Roxas75 for the reboot code.
     
  Me (Rei) for coding everything else.
  

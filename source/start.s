@@ -2,10 +2,7 @@
 .align 4
 .global _start
 _start:
-    mov r11, r0     @ argc
-    mov r12, r1     @ argv
-
- @ Change the stack pointer
+    @ Change the stack pointer
     mov sp, #0x27000000
 
     @ Give read/write access to all the memory regions
@@ -37,8 +34,6 @@ _start:
 
     @ Enable caches
     mrc p15, 0, r4, c1, c0, 0  @ read control register
-    orr r4, r4, #(1<<18)       @ - ITCM enable
-    orr r4, r4, #(1<<13)       @ - alternate exception vectors enable
     orr r4, r4, #(1<<12)       @ - instruction cache enable
     orr r4, r4, #(1<<2)        @ - data cache enable
     orr r4, r4, #(1<<0)        @ - mpu enable
@@ -55,11 +50,12 @@ _start:
 	mov r1, #0x340
 	str r1, [r0]
 
-    mov r0, r11
-    mov r1, r12
-
     @ Patch and run CFW
-    b main
+    bl mountSD
+    bl loadSplash
+    bl loadFirm
+    bl patchFirm
+    bl launchFirm
 
 .die:
     b .die
