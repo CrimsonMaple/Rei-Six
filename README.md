@@ -1,8 +1,7 @@
 # RenNand
 [![License (GPL version 3)](https://img.shields.io/badge/license-GNU%20GPL%20version%203-red.svg?style=flat-square)](http://opensource.org/licenses/GPL-3.0)
 
-*The original open source N3DS CFW!*
-<sub> (now with O3DS support!)</sub>
+*The original open source (N)3DS CFW!*
 
 
 **Compiling:**
@@ -17,13 +16,17 @@ Copy everything in 'out' folder to SD root and run!
 
 **Features:**
 
-* Ninjhax/MSET/Spider/A9LH support!
+* B9S support!
 
 * Emunand/Patched Sysnand (with '.:Rei' version string)
 
 * Sig checks disabled
 
 * Reboot Patch
+
+* AGB/TWL Patches
+
+* Flashcart Whitelist Patch
 
 * LGY FIRM patches
 
@@ -37,7 +40,6 @@ Copy everything in 'out' folder to SD root and run!
     * Auto updates disabled
     * EShop update check disabled
     * RO verification disabled
-    * [TODO]: Flashcart Whitelist Patch
     * and [MORE](https://reisyukaku.org/3DS/ReiNand/patches)
 
 **Credits:**
@@ -57,7 +59,11 @@ Copy everything in 'out' folder to SD root and run!
  Luma Dev Team for their AGB/TWL patches, and being generally helpful! No, Seriously.
  
  MidKid and Delebile for the reboot code.
+ 
+ CrimsonMaple for continuing ReiNAND.
     
- Me (Rei) for coding everything else.
+ Rei for coding the orginial ReiNAND.
+ 
+ Lilith Valentine for helping to reboot the project and testing.
  
  The community for your support and help!
