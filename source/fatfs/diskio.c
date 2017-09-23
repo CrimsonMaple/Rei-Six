@@ -10,6 +10,7 @@
 #include "fatfs/diskio.h"		/* FatFs lower layer API */
 #include "fatfs/sdmmc/sdmmc.h"
 #include "crypto.h"
+#include <string.h>
 
 /* Definitions of physical drive number for each media */
 #define SDCARD        0
@@ -37,12 +38,23 @@ DSTATUS disk_initialize (
 	BYTE pdrv				/* Physical drive nmuber to identify the drive */
 )
 {
-static u32 sdmmcInitResult = 4;
+        DSTATUS ret;
+        static u32 sdmmcInitResult = 4;
 
         if(sdmmcInitResult == 4) sdmmcInitResult = sdmmc_sdcard_init();
 
-	return ((pdrv == SDCARD && !(sdmmcInitResult & 2)) ||
-            (pdrv == CTRNAND && !(sdmmcInitResult & 1) && !nandInit())) ? 0 : STA_NOINIT;
+        if(pdrv == CTRNAND)
+        {
+            if(!(sdmmcInitResult & 1))
+            {
+                nandInit();
+                ret = 0;
+            }
+            else ret = STA_NOINIT;
+        }
+        else ret = (!(sdmmcInitResult & 2)) ? 0 : STA_NOINIT;
+
+	return ret;
 }
 
 
@@ -76,11 +88,11 @@ DRESULT disk_write (
 	UINT count			/* Number of sectors to write */
 )
 {
-	if (sdmmc_sdcard_writesectors(sector, count, (BYTE *)buff)) {
-		return RES_PARERR;
-	}
-
-	return RES_OK;
+	(void)pdrv;
+	(void)buff;
+	(void)sector;
+	(void)count;
+	return RES_PARERR;
 }
 #endif
 

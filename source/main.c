@@ -9,41 +9,37 @@
 #include "draw.h"
 #include "fs.h"
 
-void main(int argc, char **argv){ //4 l8r <3
+void main(int argc, char **argv, u32 magic){
     bool isFirmLaunch;
     u16 launchedPath[41];
     
     firmtype firm_type;
     boottype boot_type;
     
-    switch (argc){
-        // unsupported launcher
-        case 0:
-            debugWrite("/rei/debug.log", "Unsupported Launcher. ", 22);
-            break;
-        case 1: { // Normal boot
-            u32 i;
-            for (i = 0; i < 40 && argv[0][i] != 0; ++i)
-                launchedPath[i] = argv[0][i];
+    if(((magic & 0xFFFF) == 0xBEEF || (magic & 0xFFFF) == 0x2BEEF) && argc >= 1){ // Normal boot + Luma Chainloaded
+        u32 i;
+        for (i = 0; i < 40 && argv[0][i] != 0; ++i)
+            launchedPath[i] = argv[0][i];
 
-            launchedPath[i] = 0;
-            isFirmLaunch = false;
-            break;
-        }
-        case 2: {
-            u32 i;
-            u16 *p = (u16 *)argv[0];
-            for (i = 0; i < 40 && p[i] != 0; i++)
-                launchedPath[i] = p[i];
-            launchedPath[i] = 0;
-            isFirmLaunch = true;
-            break;
-        }
+        launchedPath[i] = 0;
+        isFirmLaunch = false;
     }
-
+    else if(magic == 0xBABE && argc == 2) { // Firm Launch
+        u32 i;
+        u16 *p = (u16 *)argv[0];
+        for (i = 0; i < 40 && p[i] != 0; i++)
+            launchedPath[i] = p[i];
+        launchedPath[i] = 0;
+        isFirmLaunch = true;
+    }
+    else {
+         // Unsupported launcher or launch method.
+        debugWrite("/rei/debug.log", "Unsupported launcher or launch method. ", 39);
+        shutdown();
+    }
     mountSD();
     mountNand();
-    //loadSplash();
+    loadSplash();
     
     //Boot EMUNAND if /rei/loademunand exists or R is held down. Otherwise boot SYSNAND.
     if(fopen("/rei/loademunand", "rb") || HID_PAD == (1 << 8))
@@ -52,7 +48,6 @@ void main(int argc, char **argv){ //4 l8r <3
         boot_type = SYSNAND;
     
     if(isFirmLaunch){
-        debugWrite("/rei/debug.log", "Checking argv. ", 15);
         firm_type = (firmtype)(argv[1][10] - u'0');
 
         loadFirmLegacy(boot_type, firm_type);

@@ -8,18 +8,20 @@
 #include "fs.h"
 #include "fatfs/ff.h"
 #include "fmt.h"
+#include "i2c.h"
+#include "caches.h"
 
 static FATFS sdfs, nandfs;
 static FIL fp; //Had to make a static file since fatfs hated my file pointers.
 
 u8 mountSD(void){
-    if (f_mount(&sdfs, "0:", 1)) return 1;
-    return 0;
+    if (f_mount(&sdfs, "0:", 1) != FR_OK)
+        return 1;
 }
 
 u8 mountNand(void){
-    if (f_mount(&nandfs, "1:", 1)) return 1;
-    return 0;
+    if (f_mount(&nandfs, "1:", 1) != FR_OK)
+        return 1;
 }
 
 u8 unmountSD(void){
@@ -103,12 +105,11 @@ u32 firmRead(u8 *dest, u32 firm){
 
     sprintf(firmPath, "1:/title/00040138/%s/content", firms[firm][ISN3DS ? 1 : 0]);
     u32 firmVersion = 0xDEADBEEF;
-    debugWrite("/rei/debugPath.log", firmPath, 35);
 
     DIR directory;
     FILINFO info = { 0 };
 
-    if (f_opendir(&directory, firmPath) != FR_OK) goto exit;
+    if (f_opendir(&directory, firmPath) != FR_OK) goto exit; //Issue is here!
 
     while (f_readdir(&directory, &info) == FR_OK && info.fname[0] != 0)
     {
@@ -118,23 +119,20 @@ u32 firmRead(u8 *dest, u32 firm){
 
         if (tempVer < firmVersion) firmVersion = tempVer;
     }
-    
-    debugWrite("/rei/predirclose", " ", 1);
 
-    f_closedir(&directory);
-    
-    debugWrite("/rei/postdirclose", " ", 1);
-
-    if (firmVersion == 0xDEADBEEF)
-        goto exit;
-    
-    debugWrite("/rei/postgotoexit2", " ", 1);
+    if(f_closedir(&directory) != FR_OK || firmVersion == 0xDEADBEEF) goto exit;
 
     sprintf(fullPath, "%s/%08x.app", firmPath, firmVersion);
     debugWrite("/rei/debugFullPath.log", fullPath, 48);
 
     if(lumaFileRead(dest, fullPath, 0x400000 + sizeof(Cxi) + 0x200) <= sizeof(Cxi) + 0x400) firmVersion = 0xDEADBEEF;
 exit:
-    debugWrite("/rei/firmversion.log", (char*)firmVersion, 10);
     return firmVersion;
+}
+
+void shutdown(void){
+    i2cWriteRegister(I2C_DEV_MCU, 0x22, 1 << 0); // poweroff LCD to prevent MCU hangs
+    flushEntireDCache();
+    if (i2cWriteRegister(I2C_DEV_MCU, 0x20, 1 << 0))
+        while (true);
 }

@@ -244,20 +244,20 @@ int __attribute__((noinline)) sdmmc_nand_readsectors(u32 sector_no, u32 numsecto
     return geterror(&handleNAND);
 }
 
-int __attribute__((noinline)) sdmmc_nand_writesectors(u32 sector_no, u32 numsectors, const u8 *in) //experimental
-{
-    if(handleNAND.isSDHC == 0) sector_no <<= 9;
-    inittarget(&handleNAND);
-    sdmmc_write16(REG_SDSTOP, 0x100);
-    sdmmc_write16(REG_SDBLKCOUNT32, numsectors);
-    sdmmc_write16(REG_SDBLKLEN32, 0x200);
-    sdmmc_write16(REG_SDBLKCOUNT, numsectors);
-    handleNAND.tData = in;
-    handleNAND.size = numsectors << 9;
-    sdmmc_send_command(&handleNAND, 0x52C19, sector_no);
-    inittarget(&handleSD);
-    return geterror(&handleNAND);
-}
+//int __attribute__((noinline)) sdmmc_nand_writesectors(u32 sector_no, u32 numsectors, const u8 *in) //experimental
+//{
+//    if(handleNAND.isSDHC == 0) sector_no <<= 9;
+//    inittarget(&handleNAND);
+//    sdmmc_write16(REG_SDSTOP, 0x100);
+//    sdmmc_write16(REG_SDBLKCOUNT32, numsectors);
+//    sdmmc_write16(REG_SDBLKLEN32, 0x200);
+//    sdmmc_write16(REG_SDBLKCOUNT, numsectors);
+//    handleNAND.tData = in;
+//    handleNAND.size = numsectors << 9;
+//    sdmmc_send_command(&handleNAND, 0x52C19, sector_no);
+//    inittarget(&handleSD);
+//    return geterror(&handleNAND);
+//}
 
 static u32 calcSDSize(u8 *csd, int type)
 {
@@ -291,8 +291,6 @@ static u32 calcSDSize(u8 *csd, int type)
 
 static void InitSD()
 {
-    *(vu32 *)0x10000020 = 0; //InitFS stuff
-    *(vu32 *)0x10000020 = 0x200; //InitFS stuff
     *(vu16 *)0x10006100 &= 0xF7FFu; //SDDATACTL32
     *(vu16 *)0x10006100 &= 0xEFFFu; //SDDATACTL32
     *(vu16 *)0x10006100 |= 0x402u; //SDDATACTL32
@@ -326,7 +324,7 @@ static int Nand_Init()
     handleNAND.devicenumber = 1;
 
     inittarget(&handleNAND);
-    ioDelay(0xF000);
+    waitcycles(0xF000);
 
     sdmmc_send_command(&handleNAND, 0, 0);
 
@@ -389,7 +387,7 @@ static int SD_Init()
 
     inittarget(&handleSD);
 
-    ioDelay(1u << 22); //Card needs a little bit of time to be detected, it seems FIXME test again to see what a good number is for the delay
+    waitcycles(1u << 22); //Card needs a little bit of time to be detected, it seems FIXME test again to see what a good number is for the delay
 
     //If not inserted
     if(!(*((vu16 *)(SDMMC_BASE + REG_SDSTATUS0)) & TMIO_STAT0_SIGSTATE)) return 5;

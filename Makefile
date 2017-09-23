@@ -54,7 +54,7 @@ clean:
 PHONY: $(dir_out)/boot.firm
 $(dir_out)/boot.firm: $(dir_build)/main.elf
 	@mkdir -p "$(@D)"
-	@firmtool build $@ -e 0 -D $^ -C NDMA
+	@firmtool build $@ -e 0 -D $^ -C NDMA -i
 	
 #-----------------------------------------------------------------------------------------------
 

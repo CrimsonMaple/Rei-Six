@@ -20,7 +20,6 @@
 /   866   Russian
 /   869   Greek 2
 */
-
 #include "fatfs/ff.h"
 
 
@@ -272,7 +271,7 @@ const WCHAR Tbl[] = {	/*  CP869(0x80-0xFF) to Unicode conversion table */
 
 
 
-WCHAR ff_convert (	/* Converted character, Returns zero on error */
+WCHAR ff_convert(	/* Converted character, Returns zero on error */
 	WCHAR	chr,	/* Character code to be converted */
 	UINT	dir		/* 0: Unicode to OEM code, 1: OEM code to Unicode */
 )
@@ -283,11 +282,13 @@ WCHAR ff_convert (	/* Converted character, Returns zero on error */
 	if (chr < 0x80) {	/* ASCII */
 		c = chr;
 
-	} else {
+	}
+	else {
 		if (dir) {		/* OEM code to Unicode */
 			c = (chr >= 0x100) ? 0 : Tbl[chr - 0x80];
 
-		} else {		/* Unicode to OEM code */
+		}
+		else {		/* Unicode to OEM code */
 			for (c = 0; c < 0x80; c++) {
 				if (chr == Tbl[c]) break;
 			}
@@ -300,13 +301,13 @@ WCHAR ff_convert (	/* Converted character, Returns zero on error */
 
 
 
-WCHAR ff_wtoupper (	/* Returns upper converted character */
+WCHAR ff_wtoupper(	/* Returns upper converted character */
 	WCHAR chr		/* Unicode character to be upper converted (BMP only) */
 )
 {
 	/* Compressed upper conversion table */
 	static const WCHAR cvt1[] = {	/* U+0000 - U+0FFF */
-		/* Basic Latin */
+									/* Basic Latin */
 		0x0061,0x031A,
 		/* Latin-1 Supplement */
 		0x00E0,0x0317,  0x00F8,0x0307,  0x00FF,0x0001,0x0178,
@@ -330,7 +331,7 @@ WCHAR ff_wtoupper (	/* Returns upper converted character */
 		0x0000
 	};
 	static const WCHAR cvt2[] = {	/* U+1000 - U+FFFF */
-		/* Phonetic Extensions */
+									/* Phonetic Extensions */
 		0x1D7D,0x0001,0x2C63,
 		/* Latin Extended Additional */
 		0x1E00,0x0196,  0x1EA0,0x015A,
@@ -385,4 +386,3 @@ WCHAR ff_wtoupper (	/* Returns upper converted character */
 
 	return chr;
 }
-

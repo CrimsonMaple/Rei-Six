@@ -76,8 +76,11 @@ void loadFirmLegacy(boottype boot_type, firmtype firm_type){
         } else
             memcpy(firm->section[0].address, firmLocation + firm->section[0].offset, firm->section[0].size);
         }
-        if(firm_type == AGB_FIRM){
-            fopen("/rei/agb_firmware.bin", "rb");
+        if(firm_type == AGB_FIRM || firm_type == TWL_FIRM){ // Legacy Firms
+            if(firm_type == AGB_FIRM)
+                fopen("/rei/agb_firmware.bin", "rb");
+            else
+                fopen("/rei/twl_firmware.bin", "rb");
             firmSize = fsize()/2;
             if(PDN_MPCORE_CFG == 1) fseek(firmSize); //If O3DS, load 2nd firm
             fread(firmLocation, 1, firmSize);
@@ -92,22 +95,6 @@ void loadFirmLegacy(boottype boot_type, firmtype firm_type){
                 firm->arm9Entry = (u8*)0x801301C;
             }            
         }
-        if(firm_type == TWL_FIRM){
-            fopen("/rei/twl_firmware.bin", "rb");
-            firmSize = fsize()/2;
-            if(PDN_MPCORE_CFG == 1) fseek(firmSize); //If O3DS, load 2nd firm
-            fread(firmLocation, 1, firmSize);
-            fclose();
-            decryptFirm(firmLocation, firmSize);
-    
-            //Initial setup
-            firm = firmLocation;
-            u8 *sect_arm9 = (u8*)firm + firm->section[3].offset;
-            if(ISN3DS){
-                k9loader((Arm9Bin*)sect_arm9);
-                firm->arm9Entry = (u8*)0x801301C;
-            }
-        }
         
     //Dont boot emu if AGB game was just played, or if START was held.
     getEmunandSect(&emuOffset, &emuHeader);
@@ -115,28 +102,33 @@ void loadFirmLegacy(boottype boot_type, firmtype firm_type){
 }
 
 //Load firm into FCRAM
-void loadFirmTest(firmtype firm_type, boottype boot_type){
+void loadFirmTest(boottype boot_type, firmtype firm_type){
     //Read firm from NAND.
     u32 firmVersion = firmRead((u8*)firm, firm_type); //Native Firm
     u8 *sect_arm9 = (u8*)firm + firm->section[2].offset;
     
-    if(firmVersion == 0xDEADBEEF) debugWrite("/rei/debug.log", "Failed to mount CTRNAND. ", 25);
+    int ret = 0;
+    
+    if(firmVersion == 0xDEADBEEF){
+        debugWrite("/rei/debug.log", "Failed to mount CTRNAND. ", 25);
+        shutdown();
+    }
     
     firmSize = decryptExeFs((Cxi*)((u8*)firm));
     
     if(firmSize)
         debugWrite("/rei/debug.log", "Successfully Decrypted CTRNAND FIRM. ", 37);
     
-    if(!firmSize)
+    if(!firmSize){
         debugWrite("/rei/debug.log", "Failed to decrypt the CTRNAND FIRM. ", 38);
+        shutdown();
+    }
 
     if((firm->section[3].offset != 0 ? firm->section[3].address : firm->section[2].address) != (ISN3DS ? (u8 *)0x8006000 : (u8 *)0x8006800))
-        debugWrite("/rei/debug.log", "FIRM is not for this console. ", 30);
-    
-    int ret = 0;
+        shutdown();
     
     //Initial setup
-    if (ISN3DS){
+    if(ISN3DS){
         k9loader((Arm9Bin*)sect_arm9);
         firm->arm9Entry = (u8*)0x801B01C;
     }
@@ -162,11 +154,11 @@ void loadFirmTest(firmtype firm_type, boottype boot_type){
     }
 
     getEmunandSect(&emuOffset, &emuHeader);
-    loadNandType(boot_type); //testing purposes.
+    loadNandType(boot_type);
 }
 
 void loadNandType(boottype boot_type){
-    if (boot_type == EMUNAND){
+    if(boot_type == EMUNAND){
         //Read emunand code from SD
         getEmuCode(firmLocation, firmSize, &emuCodeOffset);
         memcpy((void*)emuCodeOffset, emunand_bin, emunand_bin_size);
@@ -185,10 +177,9 @@ void loadNandType(boottype boot_type){
     
         //Add Emunand hooks
         *(u32*)(emuRead+4) = *(u32*)(emuWrite+4) = branchAddr;
-    }
-    else {
-        //Disable firm partition update if a9lh is installed
-        if(ISA9LH){
+    } else {
+        //Disable firm partition update if sighax is installed
+        if(ISSIGHAX){
             getFirmWrite(firmLocation, firmSize, &firmWriteOffset);
             *(u32*)firmWriteOffset = 0x46C02000;
         }
@@ -203,17 +194,11 @@ void patchFirm(firmtype firm_type, u16 path[]){
         *(u16*)sigPatchOffset1 = 0x2000;
         *(u32*)sigPatchOffset2 = 0x47702000;
 
-        int ret = 0;
         u8 *sect_arm9 = (u8*)firm + firm->section[2].offset;
         u32 process9Size, process9MemAddr;
         u8 *process9Offset = getProcess9Info(sect_arm9, firm->section[2].size, &process9Size, &process9MemAddr);
 
-        ret += patchFirmlaunches(process9Offset, process9Size, process9MemAddr, path, reboot_bin, reboot_bin_size);
-        
-        if(ret == 1)
-            debugWrite("/rei/debug.log", "Bad Path. ", 10);
-        if(ret == 2)
-            debugWrite("/rei/debug.log", "Couldn't find offset to patch firm. ", 36);
+        patchFirmlaunches(process9Offset, process9Size, process9MemAddr, path, reboot_bin, reboot_bin_size);
     }
     if (firm_type == AGB_FIRM){
         int ret = 0;

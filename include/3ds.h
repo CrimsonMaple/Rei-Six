@@ -111,6 +111,7 @@ typedef struct Packed
     uint8_t limits[0x40];
     uint8_t contentIndex[0xAC];
 } Ticket;
+
 typedef struct Packed
 {
     uint8_t keyX[0x10];

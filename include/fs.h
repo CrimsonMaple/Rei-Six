@@ -23,5 +23,6 @@ Size fread(const void *buffer, Size elementSize, Size elementCnt);
 void debugWrite(const char *filename, char *buffer, Size size);
 u32 lumaFileRead(void *dest, const char *path, u32 maxSize);
 u32 firmRead(u8 *dest, u32 firm);
+void shutdown(void);
 
 #endif

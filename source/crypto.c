@@ -17,215 +17,215 @@
 
 #ifndef __thumb__
 #define BSWAP32(x) {\
-	__asm__\
-	(\
-		"eor r1, %1, %1, ror #16\n\t"\
-		"bic r1, r1, #0xFF0000\n\t"\
-		"mov %0, %1, ror #8\n\t"\
-		"eor %0, %0, r1, lsr #8\n\t"\
-		:"=r"(x)\
-		:"0"(x)\
-		:"r1"\
-	);\
+    __asm__\
+    (\
+        "eor r1, %1, %1, ror #16\n\t"\
+        "bic r1, r1, #0xFF0000\n\t"\
+        "mov %0, %1, ror #8\n\t"\
+        "eor %0, %0, r1, lsr #8\n\t"\
+        :"=r"(x)\
+        :"0"(x)\
+        :"r1"\
+    );\
 };
 
 #define ADD_u128_u32(u128_0, u128_1, u128_2, u128_3, u32_0) {\
 __asm__\
-	(\
-		"adds %0, %4\n\t"\
-		"addcss %1, %1, #1\n\t"\
-		"addcss %2, %2, #1\n\t"\
-		"addcs %3, %3, #1\n\t"\
-		: "+r"(u128_0), "+r"(u128_1), "+r"(u128_2), "+r"(u128_3)\
-		: "r"(u32_0)\
-		: "cc"\
-	);\
+    (\
+        "adds %0, %4\n\t"\
+        "addcss %1, %1, #1\n\t"\
+        "addcss %2, %2, #1\n\t"\
+        "addcs %3, %3, #1\n\t"\
+        : "+r"(u128_0), "+r"(u128_1), "+r"(u128_2), "+r"(u128_3)\
+        : "r"(u32_0)\
+        : "cc"\
+    );\
 }
 #else
 #define BSWAP32(x) {x = __builtin_bswap32(x);}
 
 #define ADD_u128_u32(u128_0, u128_1, u128_2, u128_3, u32_0) {\
 __asm__\
-	(\
-		"mov r4, #0\n\t"\
-		"add %0, %0, %4\n\t"\
-		"adc %1, %1, r4\n\t"\
-		"adc %2, %2, r4\n\t"\
-		"adc %3, %3, r4\n\t"\
-		: "+r"(u128_0), "+r"(u128_1), "+r"(u128_2), "+r"(u128_3)\
-		: "r"(u32_0)\
-		: "cc", "r4"\
-	);\
+    (\
+        "mov r4, #0\n\t"\
+        "add %0, %0, %4\n\t"\
+        "adc %1, %1, r4\n\t"\
+        "adc %2, %2, r4\n\t"\
+        "adc %3, %3, r4\n\t"\
+        : "+r"(u128_0), "+r"(u128_1), "+r"(u128_2), "+r"(u128_3)\
+        : "r"(u32_0)\
+        : "cc", "r4"\
+    );\
 }
 #endif /*__thumb__*/
 
 void aes_setkey(u8 keyslot, const void* key, u32 keyType, u32 mode)
 {
-	if(keyslot <= 0x03) return; // Ignore TWL keys for now
-	u32* key32 = (u32*)key;
-	*REG_AESCNT = (*REG_AESCNT & ~(AES_CNT_INPUT_ENDIAN | AES_CNT_INPUT_ORDER)) | mode;
-	*REG_AESKEYCNT = (*REG_AESKEYCNT >> 6 << 6) | keyslot | AES_KEYCNT_WRITE;
+    if(keyslot <= 0x03) return; // Ignore TWL keys for now
+    u32* key32 = (u32*)key;
+    *REG_AESCNT = (*REG_AESCNT & ~(AES_CNT_INPUT_ENDIAN | AES_CNT_INPUT_ORDER)) | mode;
+    *REG_AESKEYCNT = (*REG_AESKEYCNT >> 6 << 6) | keyslot | AES_KEYCNT_WRITE;
 
-	REG_AESKEYFIFO[keyType] = key32[0];
-	REG_AESKEYFIFO[keyType] = key32[1];
-	REG_AESKEYFIFO[keyType] = key32[2];
-	REG_AESKEYFIFO[keyType] = key32[3];
+    REG_AESKEYFIFO[keyType] = key32[0];
+    REG_AESKEYFIFO[keyType] = key32[1];
+    REG_AESKEYFIFO[keyType] = key32[2];
+    REG_AESKEYFIFO[keyType] = key32[3];
 }
 
 void aes_use_keyslot(u8 keyslot)
 {
-	if(keyslot > 0x3F)
-		return;
+    if(keyslot > 0x3F)
+        return;
 
-	*REG_AESKEYSEL = keyslot;
-	*REG_AESCNT = *REG_AESCNT | 0x04000000; /* mystery bit */
+    *REG_AESKEYSEL = keyslot;
+    *REG_AESCNT = *REG_AESCNT | 0x04000000; /* mystery bit */
 }
 
 void aes_setiv(const void* iv, u32 mode)
 {
-	const u32* iv32 = (const u32*)iv;
-	*REG_AESCNT = (*REG_AESCNT & ~(AES_CNT_INPUT_ENDIAN | AES_CNT_INPUT_ORDER)) | mode;
+    const u32* iv32 = (const u32*)iv;
+    *REG_AESCNT = (*REG_AESCNT & ~(AES_CNT_INPUT_ENDIAN | AES_CNT_INPUT_ORDER)) | mode;
 
-	// Word order for IV can't be changed in REG_AESCNT and always default to reversed
-	if(mode & AES_INPUT_NORMAL)
-	{
-		REG_AESCTR[0] = iv32[3];
-		REG_AESCTR[1] = iv32[2];
-		REG_AESCTR[2] = iv32[1];
-		REG_AESCTR[3] = iv32[0];
-	}
-	else
-	{
-		REG_AESCTR[0] = iv32[0];
-		REG_AESCTR[1] = iv32[1];
-		REG_AESCTR[2] = iv32[2];
-		REG_AESCTR[3] = iv32[3];
-	}
+    // Word order for IV can't be changed in REG_AESCNT and always default to reversed
+    if(mode & AES_INPUT_NORMAL)
+    {
+        REG_AESCTR[0] = iv32[3];
+        REG_AESCTR[1] = iv32[2];
+        REG_AESCTR[2] = iv32[1];
+        REG_AESCTR[3] = iv32[0];
+    }
+    else
+    {
+        REG_AESCTR[0] = iv32[0];
+        REG_AESCTR[1] = iv32[1];
+        REG_AESCTR[2] = iv32[2];
+        REG_AESCTR[3] = iv32[3];
+    }
 }
 
 void aes_advctr(void* ctr, u32 val, u32 mode)
 {
-	u32* ctr32 = (u32*)ctr;
-	
-	int i;
-	if(mode & AES_INPUT_BE)
-	{
-		for(i = 0; i < 4; ++i) // Endian swap
-			BSWAP32(ctr32[i]);
-	}
-	
-	if(mode & AES_INPUT_NORMAL)
-	{
-		ADD_u128_u32(ctr32[3], ctr32[2], ctr32[1], ctr32[0], val);
-	}
-	else
-	{
-		ADD_u128_u32(ctr32[0], ctr32[1], ctr32[2], ctr32[3], val);
-	}
-	
-	if(mode & AES_INPUT_BE)
-	{
-		for(i = 0; i < 4; ++i) // Endian swap
-			BSWAP32(ctr32[i]);
-	}
+    u32* ctr32 = (u32*)ctr;
+    
+    int i;
+    if(mode & AES_INPUT_BE)
+    {
+        for(i = 0; i < 4; ++i) // Endian swap
+            BSWAP32(ctr32[i]);
+    }
+    
+    if(mode & AES_INPUT_NORMAL)
+    {
+        ADD_u128_u32(ctr32[3], ctr32[2], ctr32[1], ctr32[0], val);
+    }
+    else
+    {
+        ADD_u128_u32(ctr32[0], ctr32[1], ctr32[2], ctr32[3], val);
+    }
+    
+    if(mode & AES_INPUT_BE)
+    {
+        for(i = 0; i < 4; ++i) // Endian swap
+            BSWAP32(ctr32[i]);
+    }
 }
 
 void aes_change_ctrmode(void* ctr, u32 fromMode, u32 toMode)
 {
-	u32* ctr32 = (u32*)ctr;
-	int i;
-	if((fromMode ^ toMode) & AES_CNT_INPUT_ENDIAN)
-	{
-		for(i = 0; i < 4; ++i)
-			BSWAP32(ctr32[i]);
-	}
+    u32* ctr32 = (u32*)ctr;
+    int i;
+    if((fromMode ^ toMode) & AES_CNT_INPUT_ENDIAN)
+    {
+        for(i = 0; i < 4; ++i)
+            BSWAP32(ctr32[i]);
+    }
 
-	if((fromMode ^ toMode) & AES_CNT_INPUT_ORDER)
-	{
-		u32 temp = ctr32[0];
-		ctr32[0] = ctr32[3];
-		ctr32[3] = temp;
+    if((fromMode ^ toMode) & AES_CNT_INPUT_ORDER)
+    {
+        u32 temp = ctr32[0];
+        ctr32[0] = ctr32[3];
+        ctr32[3] = temp;
 
-		temp = ctr32[1];
-		ctr32[1] = ctr32[2];
-		ctr32[2] = temp;
-	}
+        temp = ctr32[1];
+        ctr32[1] = ctr32[2];
+        ctr32[2] = temp;
+    }
 }
 
 void aes_batch(void* dst, const void* src, u32 blockCount)
 {
-	*REG_AESBLKCNT = blockCount << 16;
-	*REG_AESCNT |=	AES_CNT_START;
-	
-	const u32* src32	= (const u32*)src;
-	u32* dst32			= (u32*)dst;
-	
-	u32 wbc = blockCount;
-	u32 rbc = blockCount;
-	
-	while(rbc)
-	{
-		if(wbc && ((*REG_AESCNT & 0x1F) <= 0xC)) // There's space for at least 4 ints
-		{
-			*REG_AESWRFIFO = *src32++;
-			*REG_AESWRFIFO = *src32++;
-			*REG_AESWRFIFO = *src32++;
-			*REG_AESWRFIFO = *src32++;
-			wbc--;
-		}
-		
-		if(rbc && ((*REG_AESCNT & (0x1F << 0x5)) >= (0x4 << 0x5))) // At least 4 ints available for read
-		{
-			*dst32++ = *REG_AESRDFIFO;
-			*dst32++ = *REG_AESRDFIFO;
-			*dst32++ = *REG_AESRDFIFO;
-			*dst32++ = *REG_AESRDFIFO;
-			rbc--;
-		}
-	}
+    *REG_AESBLKCNT = blockCount << 16;
+    *REG_AESCNT |=  AES_CNT_START;
+    
+    const u32* src32    = (const u32*)src;
+    u32* dst32          = (u32*)dst;
+    
+    u32 wbc = blockCount;
+    u32 rbc = blockCount;
+    
+    while(rbc)
+    {
+        if(wbc && ((*REG_AESCNT & 0x1F) <= 0xC)) // There's space for at least 4 ints
+        {
+            *REG_AESWRFIFO = *src32++;
+            *REG_AESWRFIFO = *src32++;
+            *REG_AESWRFIFO = *src32++;
+            *REG_AESWRFIFO = *src32++;
+            wbc--;
+        }
+        
+        if(rbc && ((*REG_AESCNT & (0x1F << 0x5)) >= (0x4 << 0x5))) // At least 4 ints available for read
+        {
+            *dst32++ = *REG_AESRDFIFO;
+            *dst32++ = *REG_AESRDFIFO;
+            *dst32++ = *REG_AESRDFIFO;
+            *dst32++ = *REG_AESRDFIFO;
+            rbc--;
+        }
+    }
 }
 
 void aes(void* dst, const void* src, u32 blockCount, void* iv, u32 mode, u32 ivMode)
 {
-	*REG_AESCNT =	mode |
-					AES_CNT_INPUT_ORDER | AES_CNT_OUTPUT_ORDER |
-					AES_CNT_INPUT_ENDIAN | AES_CNT_OUTPUT_ENDIAN |
-					AES_CNT_FLUSH_READ | AES_CNT_FLUSH_WRITE;
+    *REG_AESCNT =   mode |
+                    AES_CNT_INPUT_ORDER | AES_CNT_OUTPUT_ORDER |
+                    AES_CNT_INPUT_ENDIAN | AES_CNT_OUTPUT_ENDIAN |
+                    AES_CNT_FLUSH_READ | AES_CNT_FLUSH_WRITE;
 
-	u32 blocks;
-	while(blockCount != 0)
-	{
-		if((mode & AES_ALL_MODES) != AES_ECB_ENCRYPT_MODE
-		&& (mode & AES_ALL_MODES) != AES_ECB_DECRYPT_MODE)
-			aes_setiv(iv, ivMode);
+    u32 blocks;
+    while(blockCount != 0)
+    {
+        if((mode & AES_ALL_MODES) != AES_ECB_ENCRYPT_MODE
+        && (mode & AES_ALL_MODES) != AES_ECB_DECRYPT_MODE)
+            aes_setiv(iv, ivMode);
 
-		blocks = (blockCount >= 0xFFFF) ? 0xFFFF : blockCount;
+        blocks = (blockCount >= 0xFFFF) ? 0xFFFF : blockCount;
 
-		// Save the last block for the next decryption CBC batch's iv
-		if((mode & AES_ALL_MODES) == AES_CBC_DECRYPT_MODE)
-		{
-			memcpy(iv, src + (blocks - 1) * AES_BLOCK_SIZE, AES_BLOCK_SIZE);
-			aes_change_ctrmode(iv, AES_INPUT_BE | AES_INPUT_NORMAL, ivMode);
-		}
+        // Save the last block for the next decryption CBC batch's iv
+        if((mode & AES_ALL_MODES) == AES_CBC_DECRYPT_MODE)
+        {
+            memcpy(iv, src + (blocks - 1) * AES_BLOCK_SIZE, AES_BLOCK_SIZE);
+            aes_change_ctrmode(iv, AES_INPUT_BE | AES_INPUT_NORMAL, ivMode);
+        }
 
-		// Process the current batch
-		aes_batch(dst, src, blocks);
+        // Process the current batch
+        aes_batch(dst, src, blocks);
 
-		// Save the last block for the next encryption CBC batch's iv
-		if((mode & AES_ALL_MODES) == AES_CBC_ENCRYPT_MODE)
-		{
-			memcpy(iv, dst + (blocks - 1) * AES_BLOCK_SIZE, AES_BLOCK_SIZE);
-			aes_change_ctrmode(iv, AES_INPUT_BE | AES_INPUT_NORMAL, ivMode);
-		}
-		
-		// Advance counter for CTR mode
-		else if((mode & AES_ALL_MODES) == AES_CTR_MODE)
-			aes_advctr(iv, blocks, ivMode);
+        // Save the last block for the next encryption CBC batch's iv
+        if((mode & AES_ALL_MODES) == AES_CBC_ENCRYPT_MODE)
+        {
+            memcpy(iv, dst + (blocks - 1) * AES_BLOCK_SIZE, AES_BLOCK_SIZE);
+            aes_change_ctrmode(iv, AES_INPUT_BE | AES_INPUT_NORMAL, ivMode);
+        }
+        
+        // Advance counter for CTR mode
+        else if((mode & AES_ALL_MODES) == AES_CTR_MODE)
+            aes_advctr(iv, blocks, ivMode);
 
-		src += blocks * AES_BLOCK_SIZE;
-		dst += blocks * AES_BLOCK_SIZE;
-		blockCount -= blocks;
-	}
+        src += blocks * AES_BLOCK_SIZE;
+        dst += blocks * AES_BLOCK_SIZE;
+        blockCount -= blocks;
+    }
 }
 
 static void sha_wait_idle()
@@ -304,6 +304,7 @@ u32 nandRead(u32 sector, u32 sectorCount, u8 *buffer){ //Only Reads from the Phy
     aes_advctr(tmpCtr, ((sector + fatStart) * 0x200) / AES_BLOCK_SIZE, AES_INPUT_BE | AES_INPUT_NORMAL);
     
     result = sdmmc_nand_readsectors(sector + fatStart, sectorCount, buffer);
+    
     aes_use_keyslot(nandSlot);
     aes(buffer, buffer, (sectorCount * 0x200) / AES_BLOCK_SIZE, tmpCtr, AES_CTR_MODE, AES_INPUT_BE | AES_INPUT_NORMAL);
     
@@ -316,7 +317,7 @@ bool decryptExeFs(Cxi *cxi){
     
     u8 *exeFsOffset = (u8*)cxi + 6 * 0x200;
     u32 exeFsSize = (cxi->ncch.exeFsSize - 1) * 0x200;
-    __attribute__((aligned(4))) u8 ncchCtr[AES_BLOCK_SIZE] = {0};
+    ALIGNED(4) u8 ncchCtr[AES_BLOCK_SIZE] = {0};
     
     for(u32 i = 0; i < 8; i++)
         ncchCtr[7 - i] = cxi->ncch.partitionId[i];
@@ -351,27 +352,26 @@ void k9loader(Arm9Bin* sect_arm9){
     
     sdmmc_sdcard_init();
 
-	switch (sect_arm9->magic[3])
-	{
-		case 0xFF:
-			k9lVer = 0;
-			break;
-		case '1':
-			k9lVer = 1;
-			break;
-		default:
-			k9lVer = 2;
-			break;
-	}
+    switch (sect_arm9->magic[3]) {
+        case 0xFF:
+            k9lVer = 0;
+            break;
+        case '1':
+            k9lVer = 1;
+            break;
+        default:
+            k9lVer = 2;
+            break;
+    }
 
-	u32 *arm9BinStart = (u32*)((u8*)sect_arm9 + 0x800);
+    u32 *arm9BinStart = (u32*)((u8*)sect_arm9 + 0x800);
     if(*arm9BinStart == 0x47704770 || *arm9BinStart == 0xB0862000)
         return; //Already decrypted
 
     if (ISN3DS){
-		ALIGNED(4) u8 secretSector[512]; //Secret Sector Buffer.
+        ALIGNED(4) u8 secretSector[512]; //Setup Buffer.
 
-		sdmmc_nand_readsectors(0x96, 1, secretSector); //Read Secret Sector into Buffer.
+        sdmmc_nand_readsectors(0x96, 1, secretSector); //Read Secret Sector into Buffer.
 
         initKeyslot11(); //Init Keyslot 0x11
         aes_use_keyslot(0x11);
@@ -387,31 +387,31 @@ void k9loader(Arm9Bin* sect_arm9){
     }
 
     aes_setkey(0x11, (k9lVer == 2) ? key2 : key1, AES_KEYNORMAL, AES_INPUT_BE | AES_INPUT_NORMAL);
-	memset(key1, 0, AES_BLOCK_SIZE);
-	memset(key2, 0, AES_BLOCK_SIZE);
+    memset(key1, 0, AES_BLOCK_SIZE);
+    memset(key2, 0, AES_BLOCK_SIZE);
 
-	u8 keySlot = k9lVer == 0 ? 0x15 : 0x16;
+    u8 keySlot = k9lVer == 0 ? 0x15 : 0x16;
 
-	// KeyX
-	ALIGNED(4) u8 keyX[AES_BLOCK_SIZE];
-	aes_use_keyslot(0x11);
-	aes(keyX, k9lVer == 0 ? sect_arm9->keyX : sect_arm9->slot0x16keyX, 1, NULL, AES_ECB_DECRYPT_MODE, 0);
-	aes_setkey(keySlot, keyX, AES_KEYX, AES_INPUT_BE | AES_INPUT_NORMAL);
-	memset(keyX, 0, AES_BLOCK_SIZE);
+    // KeyX
+    ALIGNED(4) u8 keyX[AES_BLOCK_SIZE];
+    aes_use_keyslot(0x11);
+    aes(keyX, k9lVer == 0 ? sect_arm9->keyX : sect_arm9->slot0x16keyX, 1, NULL, AES_ECB_DECRYPT_MODE, 0);
+    aes_setkey(keySlot, keyX, AES_KEYX, AES_INPUT_BE | AES_INPUT_NORMAL);
+    memset(keyX, 0, AES_BLOCK_SIZE);
 
-	// KeyY
-	ALIGNED(4) u8 keyY[AES_BLOCK_SIZE];
-	memcpy(keyY, sect_arm9->keyY, sizeof(keyY));
-	aes_setkey(keySlot, keyY, AES_KEYY, AES_INPUT_BE | AES_INPUT_NORMAL);
-	memset(keyY, 0, AES_BLOCK_SIZE);
+    // KeyY
+    ALIGNED(4) u8 keyY[AES_BLOCK_SIZE];
+    memcpy(keyY, sect_arm9->keyY, sizeof(keyY));
+    aes_setkey(keySlot, keyY, AES_KEYY, AES_INPUT_BE | AES_INPUT_NORMAL);
+    memset(keyY, 0, AES_BLOCK_SIZE);
 
-	// CTR
-	ALIGNED(4) u8 CTR[AES_BLOCK_SIZE];
-	memcpy(CTR, sect_arm9->ctr, sizeof(CTR));
+    // CTR
+    ALIGNED(4) u8 CTR[AES_BLOCK_SIZE];
+    memcpy(CTR, sect_arm9->ctr, sizeof(CTR));
 
-	aes_use_keyslot(keySlot);
-	aes(arm9BinStart, arm9BinStart, decAtoi(sect_arm9->size, sizeof(sect_arm9->size)) / AES_BLOCK_SIZE, CTR, AES_CTR_MODE, AES_INPUT_BE | AES_INPUT_NORMAL);
-	memset(CTR, 0, AES_BLOCK_SIZE);
+    aes_use_keyslot(keySlot);
+    aes(arm9BinStart, arm9BinStart, decAtoi(sect_arm9->size, sizeof(sect_arm9->size)) / AES_BLOCK_SIZE, CTR, AES_CTR_MODE, AES_INPUT_BE | AES_INPUT_NORMAL);
+    memset(CTR, 0, AES_BLOCK_SIZE);
     
     if(*arm9BinStart != 0x47704770 && *arm9BinStart != 0xB0862000) //Add shutdown here instead of return.
         return;
