@@ -44,4 +44,4 @@ Copy everything in 'out' folder to SD root and run!
 
 **Credits:**
  
-https://github.com/CrimsonMaple/Rei-Six/wiki/Credits
+[Link to Credits on our Wiki!](https://github.com/CrimsonMaple/Rei-Six/wiki/Credits)
