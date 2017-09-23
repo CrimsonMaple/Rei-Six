@@ -9,7 +9,7 @@
 You'll need armips, bin2c and firmtool added to your Path. [HERE](https://reisyukaku.org/downloads/buildtools.zip) are the pre-compiled binaries for Windows.
 
     make - Compiles Everything.
-	make sighax - Compiles boot9Strap payload
+    make sighax - Compiles boot9Strap payload
 
 Copy everything in 'out' folder to SD root and run!
 
@@ -62,7 +62,7 @@ Copy everything in 'out' folder to SD root and run!
  
  CrimsonMaple for continuing ReiNAND.
     
- Rei for coding the orginial ReiNAND.
+ Reisyukaku for coding the original ReiNAND.
  
  Lilith Valentine for helping to reboot the project and testing.
  
