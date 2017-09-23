@@ -1,4 +1,4 @@
-# Rei6
+# Rei-Six
 [![License (GPL version 3)](https://img.shields.io/badge/license-GNU%20GPL%20version%203-red.svg?style=flat-square)](http://opensource.org/licenses/GPL-3.0)
 
 *The original open source (N)3DS CFW!*
@@ -44,26 +44,4 @@ Copy everything in 'out' folder to SD root and run!
 
 **Credits:**
  
- Cakes team for teaching me a few things and just being helpful in general! And for ROP/mset related code, and crypto libs.
-    
- 3DBREW for saving me plenty of reverse engineering time.
-    
- Patois/Cakes for CakesBrah.
- 
- Yifanlu for custom loader module!
- 
- Steveice10/Gudenaurock for helping a lot with arm11 stuff!
- 
- Normmatt for sdmmc.c and generally being helpful!
- 
- Luma Dev Team for their AGB/TWL patches, and being generally helpful! No, Seriously.
- 
- MidKid and Delebile for the reboot code.
- 
- CrimsonMaple for continuing ReiNAND.
-    
- Reisyukaku for coding the original ReiNAND.
- 
- Lilith Valentine for helping to reboot the project and testing.
- 
- The community for your support and help!
+https://github.com/CrimsonMaple/Rei-Six/wiki/Credits
