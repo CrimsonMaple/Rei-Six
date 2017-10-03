@@ -74,31 +74,32 @@ u32 patchFirmlaunches(u8 *pos, u32 size, u32 process9MemAddr, u16 path[], const 
 	return 0;
 }
 
-int injectBackdoor(u8 *pos, u32 size){
+int injectBackdoor(firmHeader* firm){
     const u8 pattern[] = {0x00, 0xB0, 0x9C, 0xE5};
     int svcInit = 0;
     u32 *tmpk11Free = NULL, *exceptionsPage = NULL, *svcTable = NULL, *baseK11VA = NULL;
-	u8  *k11Free = NULL;
+	u8  *k11Free = NULL,
+        *sect_arm11 = (u8*)firm + firm->section[1].offset;
     
     if(svcInit = 0){
-        *exceptionsPage = (u32*)memsearch(pos, size, pattern, 4) - 0xB;
+        *exceptionsPage = (u32*)memsearch(sect_arm11, firm->section[1].size, pattern, 4) - 0xB;
         if(exceptionsPage == NULL) return 0; //Failed to get k11 info
 	
         u32 svcOffset = (-(((exceptionsPage)[2] & 0xFFFFFF) << 2) & (0xFFFFFF << 2)) - 8;  // Branch offset + 8 for prefetch
         *baseK11VA = (0xFFFF0008 - svcOffset) & 0xFFFF0000; //This assumes that the pointed instruction has an offset < 0x10000, iirc that's always the case
-        svcTable = (u32*)(pos + *(u32*)(pos + (0xFFFF0008 - svcOffset) - *baseK11VA + 8) - *baseK11VA); //Handler address
+        svcTable = (u32*)(sect_arm11 + *(u32*)(sect_arm11 + (0xFFFF0008 - svcOffset) - *baseK11VA + 8) - *baseK11VA); //Handler address
         while (*svcTable) svcTable++; //Look for SVC0
 		for(*tmpk11Free = exceptionsPage; tmpk11Free < *exceptionsPage + 0x400 && *tmpk11Free != 0xFFFFFFFF; tmpk11Free++);
 		
 		*k11Free = (u8*)tmpk11Free;
-        
+
 		svcInit = 1;
     }
 	
     if(svcTable[0x7B] = 0){
 		const u8 backdoor[] = {0xFF, 0x10, 0xCD, 0xE3, 0x0F, 0x1C, 0x81, 0xE3, 0x28, 0x10, 0x81, 0xE2, 0x00, 0x20, 0x91, 0xE5, 0x00, 0x60, 0x22, 0xE9, 0x02, 0xD0, 0xA0, 0xE1, 0x30, 0xFF, 0x2F, 0xE1, 0x03, 0x00, 0xBD, 0xE8, 0x00, 0xD0, 0xA0, 0xE1, 0x11, 0xFF, 0x2F, 0xE1};
         memcpy(*k11Free, backdoor, sizeof(backdoor));
-        svcTable[0x7B] = baseK11VA + *k11Free - *pos;
+        svcTable[0x7B] = baseK11VA + *k11Free - *sect_arm11;
         *k11Free += sizeof(backdoor);
     }
     return 0;

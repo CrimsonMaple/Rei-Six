@@ -8,6 +8,7 @@
 #include "fatfs/sdmmc/sdmmc.h"
 #include "fatfs/ff.h"
 #include "fmt.h"
+#include "fs.h"
 
 /****************************************************************
 *                   Crypto Libs
@@ -350,8 +351,6 @@ void k9loader(Arm9Bin* sect_arm9){
     ALIGNED(4) u8 key1[AES_BLOCK_SIZE];
     ALIGNED(4) u8 key2[AES_BLOCK_SIZE];
     
-    sdmmc_sdcard_init();
-
     switch (sect_arm9->magic[3]) {
         case 0xFF:
             k9lVer = 0;
@@ -377,12 +376,20 @@ void k9loader(Arm9Bin* sect_arm9){
         aes_use_keyslot(0x11);
         for (u32 i = 0; i < 32; ++i) //Encrypt Key Sector
             aes(secretSector + (AES_BLOCK_SIZE * i), secretSector + (AES_BLOCK_SIZE * i), 1, NULL, AES_ECB_DECRYPT_MODE, 0);
-        
-        //TODO: Add check for key hashes, and SHUTDOWN for errors!
 
         //Copy keys from buffer.
         memcpy(key1, secretSector, AES_BLOCK_SIZE);
         memcpy(key2, secretSector + AES_BLOCK_SIZE, AES_BLOCK_SIZE);
+        
+        /*/Compare key hashes
+        ALIGNED(4) const u8 computed_key1[SHA_256_HASH_SIZE];
+        ALIGNED(4) const u8 computed_key2[SHA_256_HASH_SIZE];
+        
+        //Compute & Compare SHA Hashes
+        sha(computed_key1, key1, AES_BLOCK_SIZE, SHA_256_MODE);
+        sha(computed_key2, key2, AES_BLOCK_SIZE, SHA_256_MODE);*/
+        
+        //Clear buffer
         memset(secretSector, 0, 512);
     }
 
@@ -413,8 +420,10 @@ void k9loader(Arm9Bin* sect_arm9){
     aes(arm9BinStart, arm9BinStart, decAtoi(sect_arm9->size, sizeof(sect_arm9->size)) / AES_BLOCK_SIZE, CTR, AES_CTR_MODE, AES_INPUT_BE | AES_INPUT_NORMAL);
     memset(CTR, 0, AES_BLOCK_SIZE);
     
-    if(*arm9BinStart != 0x47704770 && *arm9BinStart != 0xB0862000) //Add shutdown here instead of return.
-        return;
+    if(*arm9BinStart != 0x47704770 && *arm9BinStart != 0xB0862000){
+        shutdown();
+        debugWrite("/rei/debugCrypto.log", "Failed to decrypt arm9 binary... ", 33);
+    }
 }
 
 //Decrypt firmware blob

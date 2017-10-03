@@ -14,7 +14,7 @@ void getFirmWrite(const void *pos, Size size, uPtr *off);
 u8 *getProcess9Info(u8 *pos, u32 size, u32 *process9Size, u32 *process9MemAddr);
 u32 patchFirmlaunches(u8 *pos, u32 size, u32 process9MemAddr, u16 path[], const u8 *reboot, u32 rebootSize);
 void getLoader(const void *pos, Size *ldrSize, uPtr *ldrOff);
-int injectBackdoor(u8 *pos, u32 size);
+int injectBackdoor(firmHeader *firm);
 u32 patchLgySignatureChecks(u8 *pos, u32 size);
 u32 patchTwlInvalidSignatureChecks(u8 *pos, u32 size);
 u32 patchTwlNintendoLogoChecks(u8 *pos, u32 size);

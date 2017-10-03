@@ -82,17 +82,18 @@ DRESULT disk_read (
 
 #if _USE_WRITE
 DRESULT disk_write (
+    __attribute__((unused))
 	BYTE pdrv,			/* Physical drive nmuber to identify the drive */
 	const BYTE *buff,       	/* Data to be written */
 	DWORD sector,		/* Sector address in LBA */
 	UINT count			/* Number of sectors to write */
 )
 {
-	(void)pdrv;
-	(void)buff;
-	(void)sector;
-	(void)count;
-	return RES_PARERR;
+	if(sdmmc_sdcard_writesectors(sector, count, (BYTE *)buff)){
+        return RES_PARERR;
+    }
+        
+    return RES_OK;
 }
 #endif
 

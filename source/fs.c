@@ -16,22 +16,22 @@ static FIL fp; //Had to make a static file since fatfs hated my file pointers.
 
 u8 mountSD(void){
     if (f_mount(&sdfs, "0:", 1) != FR_OK)
-        return 1;
+        shutdown();
 }
 
 u8 mountNand(void){
     if (f_mount(&nandfs, "1:", 1) != FR_OK)
-        return 1;
+        shutdown();
 }
 
 u8 unmountSD(void){
-    if (f_mount(NULL, "0:", 1)) return 1;
-    return 0;
+    if (f_mount(NULL, "0:", 1) != FR_OK)
+        shutdown();
 }
 
 u8 unmountNand(void){
-    if(f_mount(NULL, "1:", 1)) return 1;
-    return 0;
+    if(f_mount(NULL, "1:", 1) != FR_OK)
+        shutdown();
 }
 
 u8 fopen(const void *filename, const char *mode){
@@ -123,7 +123,6 @@ u32 firmRead(u8 *dest, u32 firm){
     if(f_closedir(&directory) != FR_OK || firmVersion == 0xDEADBEEF) goto exit;
 
     sprintf(fullPath, "%s/%08x.app", firmPath, firmVersion);
-    debugWrite("/rei/debugFullPath.log", fullPath, 48);
 
     if(lumaFileRead(dest, fullPath, 0x400000 + sizeof(Cxi) + 0x200) <= sizeof(Cxi) + 0x400) firmVersion = 0xDEADBEEF;
 exit:

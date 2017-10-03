@@ -107,8 +107,6 @@ void loadFirmTest(boottype boot_type, firmtype firm_type){
     u32 firmVersion = firmRead((u8*)firm, firm_type); //Native Firm
     u8 *sect_arm9 = (u8*)firm + firm->section[2].offset;
     
-    int ret = 0;
-    
     if(firmVersion == 0xDEADBEEF){
         debugWrite("/rei/debug.log", "Failed to mount CTRNAND. ", 25);
         shutdown();
@@ -116,16 +114,15 @@ void loadFirmTest(boottype boot_type, firmtype firm_type){
     
     firmSize = decryptExeFs((Cxi*)((u8*)firm));
     
-    if(firmSize)
-        debugWrite("/rei/debug.log", "Successfully Decrypted CTRNAND FIRM. ", 37);
-    
     if(!firmSize){
         debugWrite("/rei/debug.log", "Failed to decrypt the CTRNAND FIRM. ", 38);
         shutdown();
     }
 
-    if((firm->section[3].offset != 0 ? firm->section[3].address : firm->section[2].address) != (ISN3DS ? (u8 *)0x8006000 : (u8 *)0x8006800))
+    if((firm->section[3].offset != 0 ? firm->section[3].address : firm->section[2].address) != (ISN3DS ? (u8 *)0x8006000 : (u8 *)0x8006800)){
+        debugWrite("/rei/debug.log", "This firm isn't for this console. ", 34);
         shutdown();
+    }
     
     //Initial setup
     if(ISN3DS){
@@ -199,6 +196,7 @@ void patchFirm(firmtype firm_type, u16 path[]){
         u8 *process9Offset = getProcess9Info(sect_arm9, firm->section[2].size, &process9Size, &process9MemAddr);
 
         patchFirmlaunches(process9Offset, process9Size, process9MemAddr, path, reboot_bin, reboot_bin_size);
+        //injectBackdoor((firmHeader*)firm);
     }
     if (firm_type == AGB_FIRM){
         int ret = 0;

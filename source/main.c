@@ -37,6 +37,7 @@ void main(int argc, char **argv, u32 magic){
         debugWrite("/rei/debug.log", "Unsupported launcher or launch method. ", 39);
         shutdown();
     }
+    
     mountSD();
     mountNand();
     loadSplash();
