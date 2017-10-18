@@ -10,10 +10,12 @@
 #include "types.h"
 
 #define NCSD_MAGIC (0x4453434E)
+#define partitionStart (*(u32 *)(temp + 0x1C6))
 
-void getEmunandSect(uPtr *off, uPtr *head);
-void getSDMMC(const void *pos, Size size, uPtr *off);
-void getEmuRW(const void *pos, Size size, uPtr *readOff, uPtr *writeOff);
-void getMPU(const void *pos, Size size, uPtr *off);
-void getEmuCode(const void *pos, Size size, uPtr *off);
+void getEmunand(boottype boot_type);
+static u32 getSDMMC(u8 *pos, u32 size, u32 *sd_struct);
+void patchEmuRW(u8 *pos, u32 size, u32 branchOff);
+void patchMPU(u8 *pos, u32 size);
+void patchEmuCode(u8 *sect_arm9, u32 size_k9, u8 *offset_p9, u32 size_p9, u8 *addr_k9);
+
 #endif

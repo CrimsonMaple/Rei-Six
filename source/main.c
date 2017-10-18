@@ -6,6 +6,7 @@
 
 #include "firm.h"
 #include "patches.h"
+#include "emunand.h"
 #include "draw.h"
 #include "fs.h"
 
@@ -16,7 +17,7 @@ void main(int argc, char **argv, u32 magic){
     firmtype firm_type;
     boottype boot_type;
     
-    if(((magic & 0xFFFF) == 0xBEEF || (magic & 0xFFFF) == 0x2BEEF) && argc >= 1){ // Normal boot + Luma Chainloaded
+    if(((magic & 0xFFFF) == 0xBEEF || (magic & 0xFFFF) == 0x2BEEF) && argc >= 1){ // Normal boot or Luma Chainloaded (Currently based on latest stable release)
         u32 i;
         for (i = 0; i < 40 && argv[0][i] != 0; ++i)
             launchedPath[i] = argv[0][i];
@@ -24,7 +25,7 @@ void main(int argc, char **argv, u32 magic){
         launchedPath[i] = 0;
         isFirmLaunch = false;
     }
-    else if(magic == 0xBABE && argc == 2) { // Firm Launch
+    else if(magic == 0xBABE && argc == 2){ // Firmlaunch
         u32 i;
         u16 *p = (u16 *)argv[0];
         for (i = 0; i < 40 && p[i] != 0; i++)
@@ -32,7 +33,7 @@ void main(int argc, char **argv, u32 magic){
         launchedPath[i] = 0;
         isFirmLaunch = true;
     }
-    else {
+    else{
          // Unsupported launcher or launch method.
         debugWrite("/rei/debug.log", "Unsupported launcher or launch method. ", 39);
         shutdown();
@@ -43,8 +44,10 @@ void main(int argc, char **argv, u32 magic){
     loadSplash();
     
     //Boot EMUNAND if /rei/loademunand exists or R is held down. Otherwise boot SYSNAND.
-    if(fopen("/rei/loademunand", "rb") || HID_PAD == (1 << 8))
+    if(fopen("/rei/loademunand", "rb") || HID_PAD == (1 << 8)){
         boot_type = EMUNAND;
+        getEmunand(boot_type); //Have to make sure emunand exists somewhere on SD
+    }
     else
         boot_type = SYSNAND;
     
@@ -52,12 +55,12 @@ void main(int argc, char **argv, u32 magic){
         firm_type = (firmtype)(argv[1][10] - u'0');
 
         loadFirmLegacy(boot_type, firm_type);
-        patchFirm(firm_type, launchedPath);
+        patchFirm(firm_type, boot_type, launchedPath);
     }
     else{
-        loadFirmLegacy(boot_type, firm_type); //Test Doesn't work at the moment.
-        patchFirm(firm_type, launchedPath); //Awful way to do this but w/e.
+        loadFirmLegacy(boot_type, firm_type);
+        patchFirm(firm_type, boot_type, launchedPath);
     }
     
-    launchFirm(firm_type, isFirmLaunch); //and we are done here...
+    launchFirm(firm_type, isFirmLaunch);
 }

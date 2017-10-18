@@ -14,22 +14,22 @@
 static FATFS sdfs, nandfs;
 static FIL fp; //Had to make a static file since fatfs hated my file pointers.
 
-u8 mountSD(void){
+void mountSD(void){
     if (f_mount(&sdfs, "0:", 1) != FR_OK)
         shutdown();
 }
 
-u8 mountNand(void){
+void mountNand(void){
     if (f_mount(&nandfs, "1:", 1) != FR_OK)
         shutdown();
 }
 
-u8 unmountSD(void){
+void unmountSD(void){
     if (f_mount(NULL, "0:", 1) != FR_OK)
         shutdown();
 }
 
-u8 unmountNand(void){
+void unmountNand(void){
     if(f_mount(NULL, "1:", 1) != FR_OK)
         shutdown();
 }
@@ -132,6 +132,7 @@ exit:
 void shutdown(void){
     i2cWriteRegister(I2C_DEV_MCU, 0x22, 1 << 0); // poweroff LCD to prevent MCU hangs
     flushEntireDCache();
+    flushEntireICache();
     if (i2cWriteRegister(I2C_DEV_MCU, 0x20, 1 << 0))
         while (true);
 }

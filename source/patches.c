@@ -1,34 +1,44 @@
 /*
 *   patches.c
-*       by Reisyukaku
+*       by Reisyukaku, CrimsonMaple
 *   Copyright (c) 2015 All Rights Reserved
+*/
+
+/*
+*   This file is uses code from Luma3DS
+*   Copyright (C) 2016-2017 Aurora Wright, TuxSH
 */
 
 #include "patches.h"
 #include "memory.h"
-#include "types.h"
 #include "fs.h"
 
 //Offsets to redirect to thread code
-void getSigChecks(const void *pos, Size size, uPtr *off, uPtr *off2){
-    const u8 pattern[] = {0xC0, 0x1C, 0x76, 0xE7};
-    const u8 pattern2[] = {0xB5, 0x22, 0x4D, 0x0C};
+void patchSigChecks(u8 *pos, u32 size){
+    const u8 pattern[] = {0xC0, 0x1C, 0x76, 0xE7},
+             pattern2[] = {0xB5, 0x22, 0x4D, 0x0C};
 
-    *off = old_memsearch(pos, (void*)pattern, size, sizeof(pattern));
-    *off2 = old_memsearch(pos, (void*)pattern2, size, sizeof(pattern2)) - 1;
+    u16 *off = (u16 *)memsearch(pos, pattern, size, sizeof(pattern));
+    u8 *tmp = memsearch(pos, pattern2, size, sizeof(pattern2));
+    
+    u16 *off2 = (u16 *)(tmp - 1);
+    *off = off2[0] = 0x2000;
+    off2[1] = 0x4770;
 }
 
 //Offset to exe: protocol
-void getFirmWrite(const void *pos, Size size, uPtr *off){
+void patchFirmWrite(u8 *pos, u32 size){
     const u8 pattern[] = {0x00, 0x28, 0x01, 0xDA};
-    uPtr exe = old_memsearch(pos, "exe:", size, sizeof(pattern));
+    uPtr exe = memsearch(pos, "exe:", size, 4);
 
-    *off = old_memsearch((void*)exe, (void*)pattern, 0x100, sizeof(pattern));
+    u16 *off = (u16 *)memsearch(exe - 0x100, pattern, 0x100, sizeof(pattern));
+    
+    off[0] = 0x2000;
+    off[1] = 0x46C0;
 }
 
 
-u8 *getProcess9Info(u8 *pos, u32 size, u32 *process9Size, u32 *process9MemAddr) //refactor.
-{
+u8 *getProcess9Info(u8 *pos, u32 size, u32 *process9Size, u32 *process9MemAddr){
 	u8 *temp = memsearch(pos, "NCCH", size, 4);
 
 	if (temp == NULL) debugWrite("/rei/debug.log", "Failed to get Process 9 Info. ", 30);
@@ -38,23 +48,23 @@ u8 *getProcess9Info(u8 *pos, u32 size, u32 *process9Size, u32 *process9MemAddr) 
 	*process9Size = (off->ncch.exeFsSize - 1) * 0x200;
 	*process9MemAddr = off->exHeader.systemControlInfo.textCodeSet.address;
 
-	return (u8 *)off + (off->ncch.exeFsOffset + 1) * 0x200;
+	return (u8*)off + (off->ncch.exeFsOffset + 1) * 0x200;
 }
 
-u32 patchFirmlaunches(u8 *pos, u32 size, u32 process9MemAddr, u16 path[], const u8 *reboot, u32 rebootSize) //refactor. cannot merge with getProcess9.
-{
-	u32 pathLen;
+u32 patchFirmlaunches(u8 *pos, u32 size, u32 process9MemAddr, u16 path[], const u8 *reboot, u32 rebootSize){
+	u32 pathLen = sizeof(path);
 	
 	for (pathLen = 0; pathLen < 41 && path[pathLen] != 0; pathLen++);
 
 	if (path[pathLen] != 0) return 1;
 
 	//Look for firmlaunch code
-	const u8 pattern[] = { 0xE2, 0x20, 0x20, 0x90 };
+	const u8 pattern[] = {0xE2, 0x20, 0x20, 0x90};
 
 	u8 *off = memsearch(pos, pattern, size, sizeof(pattern));
 
-	if (off == NULL) return 2;
+	if (off == NULL)
+        shutdown();
 
 	off -= 0x13;
 
@@ -76,25 +86,23 @@ u32 patchFirmlaunches(u8 *pos, u32 size, u32 process9MemAddr, u16 path[], const 
 
 int injectBackdoor(firmHeader* firm){
     const u8 pattern[] = {0x00, 0xB0, 0x9C, 0xE5};
-    int svcInit = 0;
     u32 *tmpk11Free = NULL, *exceptionsPage = NULL, *svcTable = NULL, *baseK11VA = NULL;
 	u8  *k11Free = NULL,
         *sect_arm11 = (u8*)firm + firm->section[1].offset;
     
-    if(svcInit = 0){
-        *exceptionsPage = (u32*)memsearch(sect_arm11, firm->section[1].size, pattern, 4) - 0xB;
-        if(exceptionsPage == NULL) return 0; //Failed to get k11 info
-	
-        u32 svcOffset = (-(((exceptionsPage)[2] & 0xFFFFFF) << 2) & (0xFFFFFF << 2)) - 8;  // Branch offset + 8 for prefetch
-        *baseK11VA = (0xFFFF0008 - svcOffset) & 0xFFFF0000; //This assumes that the pointed instruction has an offset < 0x10000, iirc that's always the case
-        svcTable = (u32*)(sect_arm11 + *(u32*)(sect_arm11 + (0xFFFF0008 - svcOffset) - *baseK11VA + 8) - *baseK11VA); //Handler address
-        while (*svcTable) svcTable++; //Look for SVC0
-		for(*tmpk11Free = exceptionsPage; tmpk11Free < *exceptionsPage + 0x400 && *tmpk11Free != 0xFFFFFFFF; tmpk11Free++);
-		
-		*k11Free = (u8*)tmpk11Free;
+    *exceptionsPage = (u32*)memsearch(sect_arm11, firm->section[1].size, pattern, 4) - 0xB;
+    if(exceptionsPage == NULL) return 0; //Failed to get k11 info
 
-		svcInit = 1;
-    }
+    u32 svcOffset = (-(((exceptionsPage)[2] & 0xFFFFFF) << 2) & (0xFFFFFF << 2)) - 8;  // Branch offset + 8 for prefetch
+
+    *baseK11VA = (0xFFFF0008 - svcOffset) & 0xFFFF0000; //This assumes that the pointed instruction has an offset < 0x10000, iirc that's always the case
+    svcTable = (u32*)(sect_arm11 + *(u32*)(sect_arm11 + (0xFFFF0008 - svcOffset) - *baseK11VA + 8) - *baseK11VA); //Handler address
+        
+    while (*svcTable) svcTable++; //Look for SVC0
+
+    for(*tmpk11Free = exceptionsPage; tmpk11Free < *exceptionsPage + 0x400 && *tmpk11Free != 0xFFFFFFFF; tmpk11Free++);
+		
+    *k11Free = (u8*)tmpk11Free;
 	
     if(svcTable[0x7B] = 0){
 		const u8 backdoor[] = {0xFF, 0x10, 0xCD, 0xE3, 0x0F, 0x1C, 0x81, 0xE3, 0x28, 0x10, 0x81, 0xE2, 0x00, 0x20, 0x91, 0xE5, 0x00, 0x60, 0x22, 0xE9, 0x02, 0xD0, 0xA0, 0xE1, 0x30, 0xFF, 0x2F, 0xE1, 0x03, 0x00, 0xBD, 0xE8, 0x00, 0xD0, 0xA0, 0xE1, 0x11, 0xFF, 0x2F, 0xE1};
@@ -117,92 +125,4 @@ void getLoader(const void *pos, Size *ldrSize, uPtr *ldrOff){
 
     *ldrSize = s;
     *ldrOff = (uPtr)(off - (u8*)pos);
-}
-
-u32 patchLgySignatureChecks(u8 *pos, u32 size)
-{
-	const u8 pattern[] = { 0x47, 0xC1, 0x17, 0x49 };
-
-	u8 *temp = memsearch(pos, pattern, size, sizeof(pattern));
-
-	if (temp == NULL) return 1;
-
-	u16 *off = (u16 *)(temp + 1);
-	off[0] = 0x2000;
-	off[1] = 0xB04E;
-	off[2] = 0xBD70;
-
-	return 0;
-}
-
-u32 patchTwlInvalidSignatureChecks(u8 *pos, u32 size)
-{
-	const u8 pattern[] = { 0x20, 0xF6, 0xE7, 0x7F };
-
-	u8 *temp = memsearch(pos, pattern, size, sizeof(pattern));
-
-	if (temp == NULL) return 1;
-
-	u16 *off = (u16 *)(temp - 1);
-	*off = 0x2001; //mov r0, #1
-
-	return 0;
-}
-
-u32 patchTwlNintendoLogoChecks(u8 *pos, u32 size)
-{
-	const u8 pattern[] = { 0xC0, 0x30, 0x06, 0xF0 };
-
-	u16 *off = (u16 *)memsearch(pos, pattern, size, sizeof(pattern));
-
-	if (off == NULL) return 1;
-
-	off[1] = 0x2000;
-	off[2] = 0;
-
-	return 0;
-}
-
-u32 patchTwlWhitelistChecks(u8 *pos, u32 size)
-{
-	const u8 pattern[] = { 0x22, 0x00, 0x20, 0x30 };
-
-	u16 *off = (u16 *)memsearch(pos, pattern, size, sizeof(pattern));
-
-	if (off == NULL) return 1;
-
-	off[2] = 0x2000;
-	off[3] = 0;
-
-	return 0;
-}
-
-u32 patchTwlFlashcartChecks(u8 *pos, u32 size)
-{
-	const u8 pattern[] = { 0x25, 0x20, 0x00, 0x0E };
-
-	u8 *temp = memsearch(pos, pattern, size, sizeof(pattern));
-
-	if (temp == NULL)
-		return 1;
-
-	u16 *off = (u16 *)(temp + 3);
-	off[0] = off[6] = off[0xC] = 0x2001; //mov r0, #1
-	off[1] = off[7] = off[0xD] = 0; //nop
-
-	return 0;
-}
-
-u32 patchTwlShaHashChecks(u8 *pos, u32 size)
-{
-	const u8 pattern[] = { 0x10, 0xB5, 0x14, 0x22 };
-
-	u16 *off = (u16 *)memsearch(pos, pattern, size, sizeof(pattern));
-
-	if (off == NULL) return 1;
-
-	off[0] = 0x2001; //mov r0, #1
-	off[1] = 0x4770;
-
-	return 0;
 }
