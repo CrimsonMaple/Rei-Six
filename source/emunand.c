@@ -16,7 +16,7 @@
 #include "fatfs/sdmmc/sdmmc.h"
 #include "../build/payloads.h"
 
-u32 *emuOffset, *emuHeader;
+u32 emuOffset, emuHeader;
 
 void getEmunand(boottype boot_type){
     Size nandSize = getMMCDevice(0)->total_size;
@@ -26,7 +26,7 @@ void getEmunand(boottype boot_type){
     
     for(u32 i = 0; i < 3; i++){
         static const u32 rndSize[] = { 0x1D8000, 0x25E000 };
-        uPtr* nandOffset;
+        u32 nandOffset;
         
         switch(i){
             case 0:
@@ -63,7 +63,7 @@ static u32 getSDMMC(u8 *pos, u32 size, u32 *sd_struct){
     const u8 pattern[] = {0x21, 0x20, 0x18, 0x20};
     const u8 *off = memsearch(pos, pattern, size, sizeof(pattern));
 
-    sd_struct = *(u32 *)(off + 9) + *(u32 *)(off + 0xD);
+    *sd_struct = *(u32 *)(off + 9) + *(u32 *)(off + 0xD);
     
     return 0;
 }
@@ -90,19 +90,22 @@ void patchMPU(u8 *pos, u32 size){
     off[0xC] = off[0x12] = 0x0603;
 }
 
-void patchEmuCode(u8 *sect_arm9, u32 size_k9, u8 *offset_p9, u32 size_p9, u8 *addr_k9){ // pos: sect_arm9, size: size_arm9, *off = offset_p9, 
+void patchEmuCode(u8 *sect_arm9, u32 size_k9, u8 *offset_p9, u32 size_p9, u8 *addr_k9){
     //Finds start of 0xFF field
-    const u8 pattern[] = {0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF};
+    const u8 pattern[] = {0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0x00};
     u8 *space_k9 = memsearch(sect_arm9, pattern, size_k9, sizeof(pattern)) + 0x455;
     
     if(*space_k9 == NULL)
         shutdown();
     
-    memcpy((const void*)space_k9, emunand_bin, emunand_bin_size); // Copy emu code
+    memcpy(space_k9, emunand_bin, emunand_bin_size); // Copy EmuNAND code
     
-    *emuOffset == (u32*)memsearch(space_k9, "NAND", emunand_bin_size, 4); // Get emu offset and header
-    *emuHeader == (u32*)memsearch(space_k9, "NCSD", emunand_bin_size, 4);
-    
+    u32 *posOffset = (u32*)memsearch(space_k9, "NAND", emunand_bin_size, 4),
+        *posHeader = (u32*)memsearch(space_k9, "NCSD", emunand_bin_size, 4); // Add EmuNAND data
+        
+        *posOffset = emuOffset;
+        *posHeader = emuHeader;
+
     // Get SDMMC Struct
     u32 *posSdmmc = (u32*)memsearch(space_k9, "SDMC", emunand_bin_size, 4);
     u32 sd_struct;
@@ -112,5 +115,7 @@ void patchEmuCode(u8 *sect_arm9, u32 size_k9, u8 *offset_p9, u32 size_p9, u8 *ad
         *posSdmmc = sd_struct;
     
     u32 branchOff = (u32)(space_k9 - sect_arm9 + addr_k9);
-    patchEmuRW(offset_p9, size_p9, branchOff);
+    patchEmuRW(offset_p9, size_p9, branchOff); // Patch EmuNAND read/write
+    
+    patchMPU(sect_arm9, size_k9); // Patch MPU
 }
