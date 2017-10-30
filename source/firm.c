@@ -130,6 +130,7 @@ void loadFirmTest(firmtype firm_type){
 void patchFirm(firmtype firm_type, boottype boot_type, u16 path[]){
     if (firm_type == NATIVE_FIRM){
         u8 *sect_arm9 = (u8*)firm + firm->section[2].offset;
+        u8 *sect_arm11 = (u8*)firm +firm->section[1].offset;
         u32 size_p9, addr_p9;
         
         u8 *offset_p9 = getProcess9Info(sect_arm9, firm->section[2].size, &size_p9, &addr_p9);
@@ -139,14 +140,24 @@ void patchFirm(firmtype firm_type, boottype boot_type, u16 path[]){
         if(ISSIGHAX && boot_type == SYSNAND)
             patchFirmWrite(firm, firmSize);
         
-        if(boot_type == EMUNAND)
+        //Boot EmuNand if told, unless AGB_FIRM was just launched.
+        if(boot_type == EMUNAND && CFG_BOOTENV != 0x7)
             patchEmuCode(sect_arm9, size_k9, offset_p9, size_p9, firm->section[2].address);
         
         //Disable signature checks
         patchSigChecks(firm, firmSize);
 
         patchFirmlaunches(offset_p9, size_p9, addr_p9, path, reboot_bin, reboot_bin_size);
-        //injectBackdoor((firmHeader*)firm);
+        
+        //Find the Kernel11 SVC table and handler, exceptions page and free space locations
+        u32 baseK11VA;
+        u8 *freeK11Space;
+        u32 *arm11SvcHandler,
+            *arm11DAbtHandler,
+            *arm11ExceptionsPage,
+            *arm11SvcTable = getKernel11Info(sect_arm11, firm->section[1].size, &baseK11VA, &freeK11Space, &arm11SvcHandler, &arm11DAbtHandler, &arm11ExceptionsPage);
+
+        reimplementSvcBackdoor(sect_arm11, arm11SvcTable, baseK11VA, &freeK11Space);
     }
     if (firm_type == AGB_FIRM || firm_type == TWL_FIRM){
         int ret = 0;
