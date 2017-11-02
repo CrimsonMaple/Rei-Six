@@ -31,6 +31,26 @@ void shutdownLCD(void){
     }
 }
 
+void set_brightness(int brightness_level){
+    void __attribute__((naked)) ARM11(void){
+        __asm(".word 0xF10C01C0");
+        
+        *arm11Entry = 0;
+        
+        static const u32 brightness[4] = {0x5F, 0x4C, 0x39, 0x26};
+        
+        *(vu32*)0x10202240 = brightness[brightness_level];
+		*(vu32*)0x10202A40 = brightness[brightness_level];
+        
+        while(!*arm11Entry);
+        ((void (*)())*arm11Entry)();
+    }
+    if(GPU_PDN_CNT != 1){
+        *arm11Entry = (u32)ARM11;
+        while(*arm11Entry);
+    }
+}
+
 #define WAIT_FOR_ARM9() *arm11Entry = 0; while(!*arm11Entry); ((void (*)())*arm11Entry)();
 
 void  __attribute__((naked)) arm11Stub(void)

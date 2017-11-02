@@ -344,6 +344,33 @@ void initKeyslot11(void){
     aes_setkey(0x11, shasum + AES_BLOCK_SIZE, AES_KEYY, AES_INPUT_BE | AES_INPUT_NORMAL);
 }
 
+void checkKeyHash(u8* key1, u8* key2){
+    //Compare key hashes
+    ALIGNED(4) u8 computed_key1[SHA_256_HASH_SIZE];
+    ALIGNED(4) u8 computed_key2[SHA_256_HASH_SIZE];
+
+    ALIGNED(4) const u8 key1_hash[SHA_256_HASH_SIZE] = { 
+        0x18, 0x08, 0x60, 0xF9, 0x82, 0x44, 0x46, 0xB8, 0xAA, 0x2D, 0xFF, 0xB8, 0x71, 0x40, 0x27, 0x32, 0x73, 0xB6, 0xB6, 0xA9, 0xC8, 0x37, 0x72, 0x02, 0xF9, 0xC4, 0xF9, 0x72, 0x3E, 0xE9, 0x94, 0xB8
+    };
+    ALIGNED(4) const u8 key2_hash[SHA_256_HASH_SIZE] = {
+        0x9F, 0x80, 0x48, 0x66, 0xF1, 0xF0, 0x4B, 0x78, 0x8D, 0xEE, 0x09, 0x17, 0xB1, 0xBB, 0xD5, 0x5F, 0x6B, 0x87, 0xC4, 0x31, 0x37, 0x10, 0x49, 0x04, 0xF5, 0xC3, 0x4D, 0x97, 0xB2, 0x33, 0xCD, 0xDF
+    };
+
+    //Compute & Compare SHA Hashes
+    sha(computed_key1, key1, 0x10, SHA_256_MODE);
+    sha(computed_key2, key2, 0x10, SHA_256_MODE);
+    
+    int ret = 0;
+    
+    ret += memcmp(key1_hash, computed_key1, SHA_256_HASH_SIZE);
+    ret += memcmp(key2_hash, computed_key2, SHA_256_HASH_SIZE);
+    
+    if(ret != 0){
+        debugWrite("/rei/debug.log", "Secret Sector is corrupted. ", 29);
+        shutdown();
+    }
+}
+
 //Emulates the K9L process and then some
 void k9loader(Arm9Bin* sect_arm9){
     u32 k9lVer = 0;
@@ -365,10 +392,8 @@ void k9loader(Arm9Bin* sect_arm9){
     
     u32 *arm9BinStart = (u32*)((u8*)sect_arm9 + 0x800);
 
-    if(*arm9BinStart == 0x47704770 || *arm9BinStart == 0xB0862000){
-        debugWrite("/rei/debug.log", "FIRM already decrypted. ", 24);
+    if(*arm9BinStart == 0x47704770 || *arm9BinStart == 0xB0862000)
         return; //Already decrypted
-    }
 
     ALIGNED(4) u8 secretSector[512]; //Setup Buffer.
     sdmmc_nand_readsectors(0x96, 1, secretSector); //Read Secret Sector into Buffer.
@@ -382,22 +407,8 @@ void k9loader(Arm9Bin* sect_arm9){
     memcpy(key1, secretSector, AES_BLOCK_SIZE);
     memcpy(key2, secretSector + AES_BLOCK_SIZE, AES_BLOCK_SIZE);
         
-    /*/Compare key hashes
-    ALIGNED(4) const u8 computed_key1[SHA_256_HASH_SIZE];
-    ALIGNED(4) const u8 computed_key2[SHA_256_HASH_SIZE];
+    checkKeyHash(key1, key2);
 
-    ALIGNED(4) const u8 key1_hash[SHA_256_HASH_SIZE];
-    ALIGNED(4) const u8 key2_hash[SHA_256_HASH_SIZE];
-        
-    //Compute & Compare SHA Hashes
-    sha(computed_key1, key1, AES_BLOCK_SIZE, SHA_256_MODE);
-    sha(computed_key2, key2, AES_BLOCK_SIZE, SHA_256_MODE);
-        
-    if((memcmp(key1_hash, computed_key1, SHA_256_HASH_SIZE) != 0) || ,(memcmp(key2_hash, computed_key2, SHA_256_HASH_SIZE) != 0)){
-        debugWrite("/rei/debug.log", "Secret Sector is corrupted. ", 28);
-        shutdown();
-    }*/
-        
     //Clear buffer
     memset(secretSector, 0, 512);
 
