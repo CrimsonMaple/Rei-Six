@@ -407,7 +407,8 @@ void k9loader(Arm9Bin* sect_arm9){
     memcpy(key1, secretSector, AES_BLOCK_SIZE);
     memcpy(key2, secretSector + AES_BLOCK_SIZE, AES_BLOCK_SIZE);
         
-    checkKeyHash(key1, key2);
+    //Check Key1+Key2 Hashes
+    //checkKeyHash(key1, key2);
 
     //Clear buffer
     memset(secretSector, 0, 512);
