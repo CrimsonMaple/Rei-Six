@@ -28,7 +28,7 @@ uPtr firmWriteOffset = 0,
      ldrOffset = 0;
 
 //Load firm into FCRAM
-void loadFirmLegacy(boottype boot_type, firmtype firm_type){
+void loadFirmLegacy(firmtype firm_type){
     //Read FIRM from SD card and write to FCRAM
     if (firm_type == NATIVE_FIRM){
         fopen("/rei/native_firmware.bin", "rb");
@@ -138,15 +138,16 @@ void patchFirm(firmtype firm_type, boottype boot_type, u16 path[]){
         
          //Disable firm partition update if sighax is installed, and the user is using sysnand.
         if(ISSIGHAX && boot_type == SYSNAND)
-            patchFirmWrite(firm, firmSize);
+            patchFirmWrite((u8*)firm, firmSize);
         
         //Boot EmuNand if told, unless AGB_FIRM was just launched.
         if(boot_type == EMUNAND && CFG_BOOTENV != 0x7)
             patchEmuCode(sect_arm9, size_k9, offset_p9, size_p9, firm->section[2].address);
         
         //Disable signature checks
-        patchSigChecks(firm, firmSize);
+        patchSigChecks((u8*)firm, firmSize);
 
+        //Injects Reboot Code
         patchFirmlaunches(offset_p9, size_p9, addr_p9, path, reboot_bin, reboot_bin_size);
         
         //Find the Kernel11 SVC table and handler, exceptions page and free space locations
@@ -157,6 +158,7 @@ void patchFirm(firmtype firm_type, boottype boot_type, u16 path[]){
             *arm11ExceptionsPage,
             *arm11SvcTable = getKernel11Info(sect_arm11, firm->section[1].size, &baseK11VA, &freeK11Space, &arm11SvcHandler, &arm11DAbtHandler, &arm11ExceptionsPage);
 
+        //Re-inject 0x7B for NTR/Other k11 uses.
         reimplementSvcBackdoor(sect_arm11, arm11SvcTable, baseK11VA, &freeK11Space);
     }
     if (firm_type == AGB_FIRM || firm_type == TWL_FIRM){
@@ -165,9 +167,10 @@ void patchFirm(firmtype firm_type, boottype boot_type, u16 path[]){
         u32 process9Size, process9MemAddr;
         u8 *process9Offset = getProcess9Info(sect_arm9, firm->section[3].size, &process9Size, &process9MemAddr);
         
+        //Signature Checks for the AGB and TWL firms
         ret += patchLgySignatureChecks(process9Offset, process9Size);
         
-        if(firm_type = TWL_FIRM){
+        if(firm_type == TWL_FIRM){
             ret += patchTwlInvalidSignatureChecks(process9Offset, process9Size);
             ret += patchTwlNintendoLogoChecks(process9Offset, process9Size);
             ret += patchTwlWhitelistChecks(process9Offset, process9Size);

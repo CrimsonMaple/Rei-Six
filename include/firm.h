@@ -9,7 +9,7 @@
 
 #include "types.h"
 
-void loadFirmLegacy(boottype boot_type, firmtype firm_type);
+void loadFirmLegacy(firmtype firm_type);
 void loadFirmTest(firmtype firm_type);
 void patchFirm(firmtype firm_type, boottype boot_type, u16 path[]);
 void launchFirm(firmtype firm_type, bool firmLaunch);

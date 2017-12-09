@@ -52,13 +52,18 @@ void main(int argc, char **argv, u32 magic){
         boot_type = SYSNAND;
     
     if(isFirmLaunch){
-        firm_type = (firmtype)(argv[1][10] - u'0');
+        if(argv[1][14] == 2)
+            firm_type = (firmtype)(argv[1][10] - '0');
+        else{
+            debugWrite("/rei/debug.log", "Unsupported FIRM. ", 18); // This should happen if SAFE_FIRM/SYSUPDATER is launched.
+            shutdown();
+        }
 
-        loadFirmLegacy(boot_type, firm_type);
+        loadFirmLegacy(firm_type);
         patchFirm(firm_type, boot_type, launchedPath);
     }
     else{
-        loadFirmLegacy(boot_type, firm_type);
+        loadFirmLegacy(firm_type);
         patchFirm(firm_type, boot_type, launchedPath);
     }
     
