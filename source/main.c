@@ -25,7 +25,7 @@ void main(int argc, char **argv, u32 magic){
         launchedPath[i] = 0;
         isFirmLaunch = false;
     }
-    else if(magic == 0xBABE){// && argc == 2){ // Firmlaunch
+    else if(magic == 0xBABE && argc == 2){ // Firmlaunch
         u32 i;
         u16 *p = (u16 *)argv[0];
         for (i = 0; i < 40 && p[i] != 0; i++)
@@ -52,10 +52,8 @@ void main(int argc, char **argv, u32 magic){
         boot_type = SYSNAND;
     
     if(isFirmLaunch){
-        if(argv[1][14] != 1 || argv[1][14] != 3){
+        if(argv[1][14] != 1 || argv[1][14] != 3)
             firm_type = (firmtype)(argv[1][10] - '0');
-            //debugWrite("/rei/itcm_dump.bin", (void*)0x01FFF470, 0xB90); // Dump 0x7470 of ARM9 ITCM
-        }
         else{
             debugWrite("/rei/debug.log", "Unsupported FIRM. ", 18); // This should happen if SAFE_FIRM/SYSUPDATER is launched.
             shutdown();
@@ -68,6 +66,6 @@ void main(int argc, char **argv, u32 magic){
         loadFirmLegacy(firm_type);
         patchFirm(firm_type, boot_type, launchedPath);
     }
-    //fileWrite((void*)0x01FFF470, "/rei/itcm_dump_launch.bin", 0xB90);
+    
     launchFirm(firm_type, isFirmLaunch);
 }
