@@ -4,12 +4,18 @@
 *   Copyright (c) 2015 All Rights Reserved
 */
 
+/*
+*   This file is uses code from Luma3DS
+*   Copyright (C) 2016-2017 Aurora Wright, TuxSH
+*/
+
 #include <stddef.h>
 #include "fs.h"
 #include "fatfs/ff.h"
 #include "fmt.h"
 #include "i2c.h"
 #include "caches.h"
+#include "string.h"
 
 static FATFS sdfs, nandfs;
 static FIL fp; //Had to make a static file since fatfs hated my file pointers.
@@ -71,8 +77,7 @@ Size fread(const void *buffer, Size elementSize, Size elementCnt){
     return br;
 }
 
-
-void debugWrite(const char *filename, char *buffer, Size size){
+void debugWrite(const char *filename, char *buffer, Size size){ // Could also dump memory regions. Just pass an address as a buffer.
     fopen(filename, "wb");
     fwrite(buffer, 1, size);
     fclose();
@@ -93,7 +98,7 @@ u32 lumaFileRead(void *dest, const char *path, u32 maxSize){
     return ret;
 }
 
-u32 firmRead(u8 *dest, u32 firm){
+/*u32 firmRead(u8 *dest, u32 firm){
     const char *firms[3][2] =  {
         {"00000002", "20000002"}, //Native Firm
         {"00000102", "20000102"}, //TWL Firm
@@ -109,7 +114,7 @@ u32 firmRead(u8 *dest, u32 firm){
     DIR directory;
     FILINFO info = { 0 };
 
-    if (f_opendir(&directory, firmPath) != FR_OK) goto exit; //Issue is here!
+    if (f_opendir(&directory, firmPath) != FR_OK) goto exit;
 
     while (f_readdir(&directory, &info) == FR_OK && info.fname[0] != 0)
     {
@@ -127,7 +132,7 @@ u32 firmRead(u8 *dest, u32 firm){
     if(lumaFileRead(dest, fullPath, 0x400000 + sizeof(Cxi) + 0x200) <= sizeof(Cxi) + 0x400) firmVersion = 0xDEADBEEF;
 exit:
     return firmVersion;
-}
+}*/
 
 void shutdown(void){
     i2cWriteRegister(I2C_DEV_MCU, 0x22, 1 << 0); // poweroff LCD to prevent MCU hangs

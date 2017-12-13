@@ -9,6 +9,5 @@
 
 #include "types.h"
 
-u8 clearScreen(void);
 void loadSplash(void);
 #endif

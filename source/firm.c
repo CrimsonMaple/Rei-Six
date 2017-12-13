@@ -17,10 +17,11 @@
 #include "emunand.h"
 #include "lcd.h"
 #include "crypto.h"
+#include "caches.h"
 #include "../build/payloads.h"
 
 //Firm vars
-firmHeader *firm = (firmHeader*)0x24000000;
+firmHeader *firm = (firmHeader*)0x20001000;
 Size firmSize = 0;
     
 //Patch vars
@@ -192,9 +193,15 @@ void launchFirm(firmtype firm_type, bool firmLaunch){
     else
         sectionNumber = 0;
     
+    // Prepares arm11 for Firmlaunch
+    prepareFirmlaunch();
+    
     //Copy firm partitions to respective memory locations
     for(; sectionNumber < 4 && firm->section[sectionNumber].size != 0; sectionNumber++)
         memcpy(firm->section[sectionNumber].address, (u8*)firm + firm->section[sectionNumber].offset, firm->section[sectionNumber].size);
+    
+    flushEntireDCache();
+    flushEntireICache();
     
     vu32 *arm11 = (vu32*)0x1FFFFFFC; //boot9strap Arm11 Entry
     

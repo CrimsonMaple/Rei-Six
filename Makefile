@@ -17,6 +17,7 @@
  dir_loader	  := loader
  dir_out	  := out
  dir_payload  := payloads
+ dir_arm11    := arm11
 #-----------------------------------------------------------------------------------------------
 
 ASFLAGS := -mlittle-endian -mcpu=arm946e-s
@@ -47,20 +48,26 @@ loader: $(dir_out)/rei/loader.cxi
 .PHONY: clean
 clean:
 	@$(MAKE) $(FLAGS) -C $(dir_loader) clean
+	@$(MAKE) $(FLAGS) -C $(dir_arm11) clean
 	rm -rf $(dir_out) $(dir_build)
 
 #-----------------------------------------------------------------------------------------------
 
 PHONY: $(dir_out)/boot.firm
-$(dir_out)/boot.firm: $(dir_build)/main.elf
+$(dir_out)/boot.firm:  $(dir_build)/arm11.elf $(dir_build)/main.elf
 	@mkdir -p "$(@D)"
-	@firmtool build $@ -e 0 -D $^ -C NDMA -i
+	@firmtool build $@ -D $^ -A 0x18180000 0x18000000 -C XDMA NDMA -i
 	
 #-----------------------------------------------------------------------------------------------
 
 $(dir_build)/main.elf: $(payloads) $(objects_cfw)
 	# FatFs requires libgcc for __aeabi_uidiv
-	$(CC) -nostartfiles $(LDFLAGS) -T linker.ld $(OUTPUT_OPTION) $^
+	#$(CC) -nostartfiles $(LDFLAGS) -T linker.ld $(OUTPUT_OPTION) $^
+	$(LINK.o) -T linker.ld $(OUTPUT_OPTION) $^
+
+$(dir_build)/arm11.elf: $(dir_arm11)
+	@mkdir -p "$(@D)"
+	@$(MAKE) -C $<
 
 #-----------------------------------------------------------------------------------------------
 
