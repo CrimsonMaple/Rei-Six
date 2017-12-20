@@ -46,6 +46,9 @@
 #define RW_RW 3
 #define R_R 6
 
+
+#define ALIGNED(x)           __attribute__((aligned(x)))
+
 //Common data types
 typedef uint8_t u8;
 typedef uint16_t u16;
@@ -90,7 +93,7 @@ typedef struct firmSectionHeader {
 } firmSectionHeader;
 
 typedef struct firmHeader {
-    u32 magic;
+    char magic[4];
     u32 reserved1;
     u32 arm11Entry;
     u32 arm9Entry;

@@ -10,6 +10,7 @@
 */
 
 #include "lcd.h"
+#include "string.h"
 #include "i2c.h"
 
 static volatile Arm11Op *operation = (volatile Arm11Op*)0x1FF80004;

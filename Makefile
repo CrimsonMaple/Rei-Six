@@ -61,8 +61,6 @@ $(dir_out)/boot.firm:  $(dir_build)/arm11.elf $(dir_build)/main.elf
 #-----------------------------------------------------------------------------------------------
 
 $(dir_build)/main.elf: $(payloads) $(objects_cfw)
-	# FatFs requires libgcc for __aeabi_uidiv
-	#$(CC) -nostartfiles $(LDFLAGS) -T linker.ld $(OUTPUT_OPTION) $^
 	$(LINK.o) -T linker.ld $(OUTPUT_OPTION) $^
 
 $(dir_build)/arm11.elf: $(dir_arm11)

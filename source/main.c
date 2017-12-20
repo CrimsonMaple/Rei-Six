@@ -8,6 +8,7 @@
 #include "patches.h"
 #include "emunand.h"
 #include "draw.h"
+#include "lcd.h"
 #include "fs.h"
 
 void main(int argc, char **argv, u32 magic){
@@ -59,13 +60,14 @@ void main(int argc, char **argv, u32 magic){
             shutdown();
         }
 
-        loadFirmLegacy(firm_type);
+        loadFirm(firm_type);
         patchFirm(firm_type, boot_type, launchedPath);
     }
     else{
-        loadFirmLegacy(firm_type);
+        loadFirm(firm_type);
         patchFirm(firm_type, boot_type, launchedPath);
     }
     
+    clearScreen();
     launchFirm(firm_type, isFirmLaunch);
 }

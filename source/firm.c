@@ -27,17 +27,86 @@ Size firmSize = 0;
 //Patch vars
 uPtr firmWriteOffset = 0,
      ldrOffset = 0;
+     
+static __attribute__((noinline)) bool overlaps(u32 as, u32 ae, u32 bs, u32 be){
+    if(as <= bs && bs <= ae)
+        return true;
+    if(bs <= as && as <= be)
+        return true;
+    return false;
+}
+
+static __attribute__((noinline)) bool inRange(u32 as, u32 ae, u32 bs, u32 be){
+   if(as >= bs && ae <= be)
+        return true;
+   return false;
+}
+     
+static bool firmCheck(Size firmSize){
+    bool arm9EpFound = false;
+    bool arm11EpFound = false;
+    
+    if(memcmp(firm->magic, "FIRM", 4) !=0 || firm->arm9Entry == NULL)
+        return false;
+    
+    Size size = 0x200;
+    for(int i = 0; i < 4; i++)
+        size += firm->section[i].size;
+    
+    if(firmSize < size) 
+        return false;
+    
+    for(int i = 0; i < 4; i++){
+        firmSectionHeader *section = &firm->section[i];
+        
+        // Allow empty FIRM sections
+        if(section->size == 0)
+            continue;
+        
+        if((section->offset < 0x200) ||
+           (section->address + section->size < section->address) || //Overflow check
+           ((u32)section->address & 3) || (section->offset & 0x1FF) || (section->size & 0x1FF) || //Alignment check
+           (overlaps((u32)section->address, (u32)section->address + section->size, (u32)firm, (u32)firm + size)) ||
+           ((!inRange((u32)section->address, (u32)section->address + section->size, 0x08000000, 0x08000000 + 0x00100000)) &&
+            (!inRange((u32)section->address, (u32)section->address + section->size, 0x18000000, 0x18000000 + 0x00600000)) &&
+            (!inRange((u32)section->address, (u32)section->address + section->size, 0x1FF00000, 0x1FFFFC00)) &&
+            (!inRange((u32)section->address, (u32)section->address + section->size, 0x20000000, 0x20000000 + 0x8000000))))
+                return false;
+
+        ALIGNED(4) u8 hash[0x20];
+
+        sha(hash, (u8 *)firm + section->offset, section->size, SHA_256_MODE);
+
+        if(memcmp(hash, section->hash, 0x20) != 0)
+            return false;
+
+        if(firm->arm9Entry >= section->address && firm->arm9Entry < (section->address + section->size))
+            arm9EpFound = true;
+
+        if(firm->arm11Entry >= section->address && firm->arm11Entry < (section->address + section->size))
+            arm11EpFound = true;
+    }
+    return arm9EpFound && (firm->arm11Entry == NULL || arm11EpFound);
+}
 
 //Load firm into FCRAM
-void loadFirmLegacy(firmtype firm_type){
+void loadFirm(firmtype firm_type){
     //Read FIRM from SD card and write to FCRAM
-    if (firm_type == NATIVE_FIRM){
+    if (firm_type == NATIVE_FIRM){ // Native Firm
         fopen("/rei/native_firmware.bin", "rb");
         firmSize = fsize()/2;
-        if(PDN_MPCORE_CFG == 1) fseek(firmSize); //If O3DS, load 2nd firm
+        
+        if(PDN_MPCORE_CFG == 1) 
+            fseek(firmSize); //If O3DS, load 2nd firm
+        
         fread(firm, 1, firmSize);
         fclose();
         decryptFirm(firm, firmSize);
+    
+        if(!firmCheck(firmSize)){
+            debugWrite("/rei/debug.log", "External FIRM is invalid or corrupt. If this issue persists after a reinstall, make an issue.", 93);
+            shutdown();
+        }
     
         //Initial setup
         u8 *sect_arm9 = (u8*)firm + firm->section[2].offset;
@@ -67,10 +136,18 @@ void loadFirmLegacy(firmtype firm_type){
             else
                 fopen("/rei/twl_firmware.bin", "rb");
             firmSize = fsize()/2;
-            if(PDN_MPCORE_CFG == 1) fseek(firmSize); //If O3DS, load 2nd firm
+            
+            if(PDN_MPCORE_CFG == 1) 
+                fseek(firmSize); //If O3DS, load 2nd firm
+            
             fread(firm, 1, firmSize);
             fclose();
             decryptFirm(firm, firmSize);
+    
+            if(!firmCheck(firmSize)){
+                debugWrite("/rei/debug.log", "External FIRM is invalid or corrupt. If this issue persists after a reinstall, make an issue.", 93);
+                shutdown();
+            }
     
             //Initial setup
             firm = firm;
@@ -80,51 +157,6 @@ void loadFirmLegacy(firmtype firm_type){
                 firm->arm9Entry = (u8*)0x801301C;
             }            
         }
-}
-
-//Load firm into FCRAM
-void loadFirmTest(firmtype firm_type){
-    //Read firm from NAND.
-    u32 firmVersion = firmRead((u8*)firm, firm_type); //Native Firm
-    u8 *sect_arm9 = (u8*)firm + firm->section[2].offset;
-    
-    if(firmVersion == 0xDEADBEEF){
-        debugWrite("/rei/debug.log", "Failed to mount CTRNAND. ", 25);
-        shutdown();
-    }
-    
-    firmSize = decryptExeFs((Cxi*)((u8*)firm));
-    
-    if(!firmSize){
-        debugWrite("/rei/debug.log", "Failed to decrypt the CTRNAND FIRM. ", 38);
-        shutdown();
-    }
-
-    if((firm->section[3].offset != 0 ? firm->section[3].address : firm->section[2].address) != (ISN3DS ? (u8*)0x8006000 : (u8*)0x8006800)){
-        debugWrite("/rei/debug.log", "This firm isn't for this console. ", 34);
-        shutdown();
-    }
-    
-    //Initial setup
-    if(ISN3DS){
-        k9loader((Arm9Bin*)sect_arm9);
-        firm->arm9Entry = (u8*)0x801B01C;
-    }
-    
-    //Inject custom loader if exists
-    if(fopen("/rei/loader.cxi", "rb")){
-        u8 *arm11SysMods = (u8*)firm + firm->section[0].offset;
-        Size ldrInFirmSize;
-        Size ldrFileSize = fsize();
-        getLoader(arm11SysMods, &ldrInFirmSize, &ldrOffset);
-        memcpy(firm->section[0].address, arm11SysMods, ldrOffset);
-        fread(firm->section[0].address + ldrOffset, 1, ldrFileSize);
-        memcpy(firm->section[0].address + ldrOffset + ldrFileSize, arm11SysMods + ldrOffset + ldrInFirmSize, firm->section[0].size - (ldrOffset + ldrInFirmSize));
-        fclose();
-    }
-    else{
-        memcpy(firm->section[0].address, firm + firm->section[0].offset, firm->section[0].size);
-    }
 }
 
 //Patches arm9 things on Sys/Emu

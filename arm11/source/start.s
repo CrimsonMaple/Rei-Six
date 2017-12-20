@@ -50,8 +50,8 @@ start:
     @ Invalidate both caches, flush the prefetch buffer then DSB
     mov r0, #0
     mcr p15, 0, r0, c7, c5, 4
-    mcr p15, 0, r0, c7, c7, 0
     mcr p15, 0, r0, c7, c10, 4
+    mcr p15, 0, r0, c7, c7, 0
 
     @ Clear BSS
     ldr r0, =__bss_start
