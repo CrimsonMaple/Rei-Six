@@ -91,10 +91,12 @@
 //Crypto stuff
 void sha(void *res, const void *src, u32 size, u32 mode);
 
+void aes(void* dst, const void* src, u32 blockCount, void* iv, u32 mode, u32 ivMode);
+void aes_advctr(void* ctr, u32 val, u32 mode);
+void aes_use_keyslot(u8 keyslot);
+
 //NAND/FIRM stuff
-int nandInit(void);
-u32 nandRead(u32 sector, u32 sectorCount, u8 *buffer);
-bool decryptExeFs(Cxi *cxi);
+u32 decryptExeFs(Cxi *cxi);
 void k9loader(Arm9Bin* arm9Section);
 void decryptFirm(void *firm, Size firmSize);
 

@@ -10,4 +10,5 @@
 #include "types.h"
 
 void loadSplash(void);
+
 #endif

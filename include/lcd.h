@@ -17,7 +17,7 @@ static struct fb {
     u8 *top_left;
     u8 *top_right;
     u8 *bottom;
-} __attribute__((packed));
+};
 
 typedef enum {
     INIT_SCREENS = 0,

@@ -9,7 +9,8 @@
 
 #include "types.h"
 
-void loadFirm(firmtype firm_type);
+void loadFirm_SYSNAND(firmtype firm_type);
+void loadFirm_EMUNAND(firmtype firm_type);
 void patchFirm(firmtype firm_type, boottype boot_type, u16 path[]);
 void launchFirm(firmtype firm_type, bool firmLaunch);
 

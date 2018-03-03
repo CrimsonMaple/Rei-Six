@@ -1,6 +1,6 @@
 /*
 *   firm.c
-*       by Reisyukaku, CrimsonMaple
+*       by CrimsonMaple
 *   Copyright (c) 2015-2017 All Rights Reserved
 */
 
@@ -86,35 +86,72 @@ static bool firmCheck(Size firmSize){
         if(firm->arm11Entry >= section->address && firm->arm11Entry < (section->address + section->size))
             arm11EpFound = true;
     }
+
     return arm9EpFound && (firm->arm11Entry == NULL || arm11EpFound);
 }
 
-//Load firm into FCRAM
-void loadFirm(firmtype firm_type){
-    //Read FIRM from SD card and write to FCRAM
-    if (firm_type == NATIVE_FIRM){ // Native Firm
+void loadFirm_SYSNAND(firmtype firm_type){
+    const char *firms[3][2] =  {
+        {o3ds_native_firm, n3ds_native_firm}, //Native Firm
+        {o3ds_twl_firm, n3ds_twl_firm}, //TWL Firm
+        {o3ds_agb_firm, n3ds_agb_firm}, //AGB Firm
+    };
+    
+    fopen(firms[firm_type][ISN3DS ? 1 : 0], "rb");
+    u32 FIRM_SIZE = fsize();
+    fread(firm, 1, FIRM_SIZE);
+    fclose();
+    
+    FIRM_SIZE = decryptExeFs((Cxi*)firm);
+    
+    if (!FIRM_SIZE){
+        debugWrite("/rei/debug.log", "Failed to decrypt FIRM.", 23);
+        shutdown();
+    }
+    
+    if(!firmCheck(FIRM_SIZE)){
+        debugWrite("/rei/debug.log", "External FIRM is invalid or corrupt. If this issue persists after a reinstall, make an issue.", 93);
+        shutdown();
+    }
+    
+    if((firm->section[3].offset != 0 ? firm->section[3].address : firm->section[2].address) != (ISN3DS ? (u8*)0x8006000 : (u8*)0x8006800))
+        shutdown();
+}
+
+void loadFirm_EMUNAND(firmtype firm_type){
+    // TODO: Create firm file if one doesn't exist.
+    if(firm_type == NATIVE_FIRM)
         fopen("/rei/native_firmware.bin", "rb");
-        firmSize = fsize()/2;
-        
-        if(PDN_MPCORE_CFG == 1) 
-            fseek(firmSize); //If O3DS, load 2nd firm
-        
-        fread(firm, 1, firmSize);
-        fclose();
-        decryptFirm(firm, firmSize);
+    if(firm_type == TWL_FIRM)
+        fopen("/rei/twl_firmware.bin", "rb");
+    if(firm_type == AGB_FIRM)
+        fopen("/rei/agb_firmware.bin", "rb");
     
-        if(!firmCheck(firmSize)){
-            debugWrite("/rei/debug.log", "External FIRM is invalid or corrupt. If this issue persists after a reinstall, make an issue.", 93);
-            shutdown();
-        }
+    u32 FIRM_SIZE = fsize();
+    fread(firm, 1, FIRM_SIZE);
+    fclose();
     
-        //Initial setup
+    if(!firmCheck(FIRM_SIZE)){
+        debugWrite("/rei/debug.log", "External FIRM is invalid or corrupt. If this issue persists after a reinstall, make an issue.", 93);
+        shutdown();
+    }
+    
+    if((firm->section[3].offset != 0 ? firm->section[3].address : firm->section[2].address) != (ISN3DS ? (u8*)0x8006000 : (u8*)0x8006800))
+        shutdown();
+}
+
+//Patches arm9 things on Sys/Emu
+void patchFirm(firmtype firm_type, boottype boot_type, u16 path[]){
+    if (firm_type == NATIVE_FIRM){
         u8 *sect_arm9 = (u8*)firm + firm->section[2].offset;
+        u8 *sect_arm11 = (u8*)firm +firm->section[1].offset;
+        u32 size_p9, addr_p9;
+        
         if(ISN3DS){
             k9loader((Arm9Bin*)sect_arm9);
             firm->arm9Entry = (u8*)0x801B01C;
         }
-    
+        
         //Inject custom loader if exists
         if(fopen("/rei/loader.cxi", "rb")){
             u8 *arm11SysMods = (u8*)firm + firm->section[0].offset;
@@ -125,46 +162,9 @@ void loadFirm(firmtype firm_type){
             fread(firm->section[0].address + ldrOffset, 1, ldrFileSize);
             memcpy(firm->section[0].address + ldrOffset + ldrFileSize, arm11SysMods + ldrOffset + ldrInFirmSize, firm->section[0].size - (ldrOffset + ldrInFirmSize));
             fclose();
-        }
-        else{
+        } else {
             memcpy(firm->section[0].address, firm + firm->section[0].offset, firm->section[0].size);
         }
-    }
-        if(firm_type == AGB_FIRM || firm_type == TWL_FIRM){ // Legacy Firms
-            if(firm_type == AGB_FIRM)
-                fopen("/rei/agb_firmware.bin", "rb");
-            else
-                fopen("/rei/twl_firmware.bin", "rb");
-            firmSize = fsize()/2;
-            
-            if(PDN_MPCORE_CFG == 1) 
-                fseek(firmSize); //If O3DS, load 2nd firm
-            
-            fread(firm, 1, firmSize);
-            fclose();
-            decryptFirm(firm, firmSize);
-    
-            if(!firmCheck(firmSize)){
-                debugWrite("/rei/debug.log", "External FIRM is invalid or corrupt. If this issue persists after a reinstall, make an issue.", 93);
-                shutdown();
-            }
-    
-            //Initial setup
-            firm = firm;
-            u8 *sect_arm9 = (u8*)firm + firm->section[3].offset;
-            if(ISN3DS){
-                k9loader((Arm9Bin*)sect_arm9);
-                firm->arm9Entry = (u8*)0x801301C;
-            }            
-        }
-}
-
-//Patches arm9 things on Sys/Emu
-void patchFirm(firmtype firm_type, boottype boot_type, u16 path[]){
-    if (firm_type == NATIVE_FIRM){
-        u8 *sect_arm9 = (u8*)firm + firm->section[2].offset;
-        u8 *sect_arm11 = (u8*)firm +firm->section[1].offset;
-        u32 size_p9, addr_p9;
         
         u8 *offset_p9 = getProcess9Info(sect_arm9, firm->section[2].size, &size_p9, &addr_p9);
         u32 size_k9 = (u32)(offset_p9 - sect_arm9) - sizeof(Cxi) - 0x200;
@@ -195,9 +195,13 @@ void patchFirm(firmtype firm_type, boottype boot_type, u16 path[]){
         reimplementSvcBackdoor(sect_arm11, arm11SvcTable, baseK11VA, &freeK11Space);
     }
     if (firm_type == AGB_FIRM || firm_type == TWL_FIRM){
-        int ret = 0;
         u8 *sect_arm9 = (u8*)firm + firm->section[3].offset;
-        u32 process9Size, process9MemAddr;
+        if(ISN3DS){
+            k9loader((Arm9Bin*)sect_arm9);
+            firm->arm9Entry = (u8*)0x801301C;
+        }
+        
+        u32 process9Size, process9MemAddr, ret;
         u8 *process9Offset = getProcess9Info(sect_arm9, firm->section[3].size, &process9Size, &process9MemAddr);
         
         //Signature Checks for the AGB and TWL firms
@@ -219,7 +223,7 @@ void patchFirm(firmtype firm_type, boottype boot_type, u16 path[]){
 }
 
 void launchFirm(firmtype firm_type, bool firmLaunch){
-    int sectionNumber;
+    u32 sectionNumber;
     if (firm_type == NATIVE_FIRM)
         sectionNumber = 1;
     else
@@ -231,17 +235,17 @@ void launchFirm(firmtype firm_type, bool firmLaunch){
     //Copy firm partitions to respective memory locations
     for(; sectionNumber < 4 && firm->section[sectionNumber].size != 0; sectionNumber++)
         memcpy(firm->section[sectionNumber].address, (u8*)firm + firm->section[sectionNumber].offset, firm->section[sectionNumber].size);
-    
+
     flushEntireDCache();
     flushEntireICache();
-    
+
     vu32 *arm11 = (vu32*)0x1FFFFFFC; //boot9strap Arm11 Entry
-    
-    if(!firmLaunch)
+
+    if(!firmLaunch || CFG_BOOTENV == 0x7)
         shutdownLCD();
-    
+
     *arm11 = firm->arm11Entry;
-    
+
     //Final jump to arm9 binary
     u32 entry = firm->arm9Entry;
     ((void (*)())entry)();

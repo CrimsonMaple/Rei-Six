@@ -22,11 +22,8 @@ Size fsize(void);
 Size fwrite(const void *buffer, Size elementSize, Size elementCnt);
 Size fread(const void *buffer, Size elementSize, Size elementCnt);
 
+//char read_firmware(u8 *dest, u32 firm);
 void debugWrite(const char *filename, char *buffer, Size size);
-
-u32 lumaFileRead(void *dest, const char *path, u32 maxSize);
-//u32 firmRead(u8 *dest, u32 firm)
-
 void shutdown(void);
 
 #endif

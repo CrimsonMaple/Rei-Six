@@ -1,6 +1,6 @@
 /*
 *   main.c
-*       by Reisyukaku & CrimsonMaple
+*       by CrimsonMaple
 *   Copyright (c) 2017 All Rights Reserved
 */
 
@@ -18,7 +18,7 @@ void main(int argc, char **argv, u32 magic){
     firmtype firm_type;
     boottype boot_type;
     
-    if(((magic & 0xFFFF) == 0xBEEF || (magic & 0xFFFF) == 0x2BEEF) && argc >= 1){ // Normal boot or Luma Chainloaded (Currently based on latest stable release)
+    if(((magic & 0xFFFF) == 0xBEEF || (magic & 0xFFFF) == 0x3BEEF) && argc >= 1){ // Normal boot or Luma Chainloaded (Currently based on latest stable release)
         u32 i;
         for (i = 0; i < 40 && argv[0][i] != 0; ++i)
             launchedPath[i] = argv[0][i];
@@ -43,14 +43,15 @@ void main(int argc, char **argv, u32 magic){
     mountSD();
     mountNand();
     loadSplash();
-    
+
     //Boot EMUNAND if /rei/loademunand exists or R is held down. Otherwise boot SYSNAND.
     if(fopen("/rei/loademunand", "rb") || HID_PAD == (1 << 8)){
         boot_type = EMUNAND;
         getEmunand(boot_type); //Have to make sure emunand exists somewhere on SD
     }
-    else
+    else{
         boot_type = SYSNAND;
+    }
     
     if(isFirmLaunch){
         if(argv[1][14] != 1 || argv[1][14] != 3)
@@ -59,15 +60,21 @@ void main(int argc, char **argv, u32 magic){
             debugWrite("/rei/debug.log", "Unsupported FIRM. ", 18); // This should happen if SAFE_FIRM/SYSUPDATER is launched.
             shutdown();
         }
+        if(boot_type == SYSNAND)
+            loadFirm_SYSNAND(firm_type);
+        if(boot_type == EMUNAND)
+            loadFirm_EMUNAND(firm_type);
 
-        loadFirm(firm_type);
         patchFirm(firm_type, boot_type, launchedPath);
     }
     else{
-        loadFirm(firm_type);
+        if(boot_type == SYSNAND)
+            loadFirm_SYSNAND(firm_type);
+        if(boot_type == EMUNAND)
+            loadFirm_EMUNAND(firm_type);
+
         patchFirm(firm_type, boot_type, launchedPath);
     }
     
-    clearScreen();
     launchFirm(firm_type, isFirmLaunch);
 }

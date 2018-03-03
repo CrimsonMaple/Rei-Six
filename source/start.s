@@ -5,14 +5,9 @@ _start:
     mov r11, r0     @ argc
     mov r12, r1     @ argv
     mov r8,  r2     @ magic
-    
-    @ Disable interrupts
-    mrs r4, cpsr
-    orr r4, #0x1C0
-    msr cpsr_cx, r4
 
     @ Change the stack pointer
-    mov sp, #0x27000000
+    mov sp, #0x08100000
     
     @ Disable caches / MPU
     mrc p15, 0, r4, c1, c0, 0  @ read control register
@@ -21,9 +16,12 @@ _start:
     bic r4, #(1<<0)            @ - mpu disable
     mcr p15, 0, r4, c1, c0, 0  @ write control register
 
-    @ Flush caches
-    bl flushEntireDCache
-    bl flushEntireICache
+    @ Invalidate both caches, discarding any data they may contain,
+    @ then drain the write buffer
+    mov r4, #0
+    mcr p15, 0, r4, c7, c5, 0
+    mcr p15, 0, r4, c7, c6, 0
+    mcr p15, 0, r4, c7, c10, 4
 
     @ Give read/write access to all the memory regions
     ldr r0, =0x33333333

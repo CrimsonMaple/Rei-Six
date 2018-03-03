@@ -7,7 +7,7 @@
 
  include $(DEVKITARM)/base_tools
 
- name := ReiNand
+ name := Rei-Six
 
 #-----------------------------------------------------------------------------------------------
  dir_source	  := source
@@ -69,7 +69,7 @@ $(dir_build)/arm11.elf: $(dir_arm11)
 
 #-----------------------------------------------------------------------------------------------
 
-$(dir_out)/rei/: $(dir_common)/native_firmware.bin $(dir_common)/agb_firmware.bin $(dir_common)/twl_firmware.bin $(dir_common)/top_splash.bin $(dir_common)/bottom_splash.bin
+$(dir_out)/rei/: $(dir_common)/top_splash.bin $(dir_common)/bottom_splash.bin
 	@mkdir -p "$(dir_out)/rei"
 	@cp -av $^ $@
 

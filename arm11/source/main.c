@@ -37,6 +37,8 @@ extern u32 prepareForFirmlaunchSize;
 
 extern volatile Arm11Op operation;
 
+// *((vu32*)0x10202204) = 1<<24 | 0xFF;
+
 static void initScreens(u32 brightnessLevel, struct fb *fbs)
 {
     *(vu32 *)0x10141200 = 0x1007F;

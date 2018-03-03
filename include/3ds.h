@@ -88,32 +88,6 @@ typedef struct Packed
 
 typedef struct Packed
 {
-    char sigIssuer[0x40];
-    uint8_t eccPubKey[0x3C];
-    uint8_t version;
-    uint8_t caCrlVersion;
-    uint8_t signerCrlVersion;
-    uint8_t titleKey[0x10];
-    uint8_t reserved1;
-    uint8_t ticketId[8];
-    uint8_t consoleId[4];
-    uint8_t titleId[8];
-    uint8_t reserved2[2];
-    uint16_t ticketTitleVersion;
-    uint8_t reserved3[8];
-    uint8_t licenseType;
-    uint8_t ticketCommonKeyYIndex; //Ticket common keyY index, usually 0x1 for retail system titles.
-    uint8_t reserved4[0x2A];
-    uint8_t unk[4]; //eShop Account ID?
-    uint8_t reserved5;
-    uint8_t audit;
-    uint8_t reserved6[0x42];
-    uint8_t limits[0x40];
-    uint8_t contentIndex[0xAC];
-} Ticket;
-
-typedef struct Packed
-{
     uint8_t keyX[0x10];
     uint8_t keyY[0x10];
     uint8_t ctr[0x10];

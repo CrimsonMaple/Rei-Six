@@ -12,10 +12,10 @@
 #include <stddef.h>
 #include "fs.h"
 #include "fatfs/ff.h"
-#include "fmt.h"
 #include "i2c.h"
 #include "caches.h"
 #include "string.h"
+#include "draw.h"
 
 static FATFS sdfs, nandfs;
 static FIL fp; //Had to make a static file since fatfs hated my file pointers.
@@ -83,59 +83,8 @@ void debugWrite(const char *filename, char *buffer, Size size){ // Could also du
     fclose();
 }
 
-u32 lumaFileRead(void *dest, const char *path, u32 maxSize){
-    FIL file;
-    u32 ret = 0;
-
-    if(f_open(&file, path, FA_READ) != FR_OK) return ret;
-
-    u32 size = f_size(&file);
-    if(dest == NULL) ret = size;
-    else if(size <= maxSize)
-        f_read(&file, dest, size, (unsigned int *)&ret);
-    f_close(&file);
-
-    return ret;
-}
-
-/*u32 firmRead(u8 *dest, u32 firm){
-    const char *firms[3][2] =  {
-        {"00000002", "20000002"}, //Native Firm
-        {"00000102", "20000102"}, //TWL Firm
-        {"00000202", "20000202"}, //AGB Firm
-    };
-
-    char firmPath[35] = { 0 };
-    char fullPath[48] = { 0 };
-
-    sprintf(firmPath, "1:/title/00040138/%s/content", firms[firm][ISN3DS ? 1 : 0]);
-    u32 firmVersion = 0xDEADBEEF;
-
-    DIR directory;
-    FILINFO info = { 0 };
-
-    if (f_opendir(&directory, firmPath) != FR_OK) goto exit;
-
-    while (f_readdir(&directory, &info) == FR_OK && info.fname[0] != 0)
-    {
-        if (info.fname[9] != 'a' || strlen(info.fname) != 12) continue;
-
-        u32 tempVer = hexAtoi(info.altname, 8);
-
-        if (tempVer < firmVersion) firmVersion = tempVer;
-    }
-
-    if(f_closedir(&directory) != FR_OK || firmVersion == 0xDEADBEEF) goto exit;
-
-    sprintf(fullPath, "%s/%08x.app", firmPath, firmVersion);
-
-    if(lumaFileRead(dest, fullPath, 0x400000 + sizeof(Cxi) + 0x200) <= sizeof(Cxi) + 0x400) firmVersion = 0xDEADBEEF;
-exit:
-    return firmVersion;
-}*/
-
 void shutdown(void){
-    i2cWriteRegister(I2C_DEV_MCU, 0x22, 1 << 0); // poweroff LCD to prevent MCU hangs
+    i2cWriteRegister(I2C_DEV_MCU, 0x22, 1 << 0); // Poweroff LCD to prevent MCU hangs
     flushEntireDCache();
     flushEntireICache();
     if (i2cWriteRegister(I2C_DEV_MCU, 0x20, 1 << 0))

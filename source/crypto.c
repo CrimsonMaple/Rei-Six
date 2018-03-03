@@ -7,7 +7,7 @@
 #include "memory.h"
 #include "fatfs/sdmmc/sdmmc.h"
 #include "fatfs/ff.h"
-#include "fmt.h"
+#include "draw.h"
 #include "fs.h"
 
 /****************************************************************
@@ -272,49 +272,12 @@ void sha(void *res, const void *src, u32 size, u32 mode)
     memcpy(res, (void *)REG_SHA_HASH, hashSize);
 }
 
-
-void xor(u8 *dest, const u8 *data1, const u8 *data2, Size size){
-    u32 i; for(i = 0; i < size; i++) *((u8*)dest+i) = *((u8*)data1+i) ^ *((u8*)data2+i);
-}
-
 /****************************************************************
 *                   Nand/FIRM Crypto stuff
 ****************************************************************/
-ALIGNED(4) static u8 nandCtr[AES_BLOCK_SIZE];
-static u8 nandSlot;
-static u32 fatStart;
-
-int nandInit(void){
-    ALIGNED(4) u8 cid[AES_BLOCK_SIZE],
-               shaSum[SHA_256_HASH_SIZE];
-    
-    sdmmc_get_cid(1, (u32*)cid);
-    sha(shaSum, cid, AES_BLOCK_SIZE, SHA_256_MODE);
-    memcpy(nandCtr, shaSum, sizeof(nandCtr));
-    
-    if(ISN3DS){ fatStart = 0x5CAD7; nandSlot = 0x05; } else { fatStart = 0x5CAE5; nandSlot = 0x04; }
-    
-    return 1;
-}
-
-u32 nandRead(u32 sector, u32 sectorCount, u8 *buffer){ //Only Reads from the Physical Nand for simplicity.
-    u32 result;
-    ALIGNED(4) u8 tmpCtr[AES_BLOCK_SIZE]; //Set variable for result and copy nandCtr to a Temp variable.
-    
-    memcpy(tmpCtr, nandCtr, sizeof(nandCtr)); //copy nandCtr to tmpCtr
-    aes_advctr(tmpCtr, ((sector + fatStart) * 0x200) / AES_BLOCK_SIZE, AES_INPUT_BE | AES_INPUT_NORMAL);
-    
-    result = sdmmc_nand_readsectors(sector + fatStart, sectorCount, buffer);
-    
-    aes_use_keyslot(nandSlot);
-    aes(buffer, buffer, (sectorCount * 0x200) / AES_BLOCK_SIZE, tmpCtr, AES_CTR_MODE, AES_INPUT_BE | AES_INPUT_NORMAL);
-    
-    return result;
-}
-
-bool decryptExeFs(Cxi *cxi){
-    if(memcmp(cxi->ncch.magic, "NCCH", 4) != 0) 
-        return false;
+u32 decryptExeFs(Cxi *cxi){
+    if(memcmp(cxi->ncch.magic, "NCCH", 4) != 0)
+        return 0;
     
     u8 *exeFsOffset = (u8*)cxi + 6 * 0x200;
     u32 exeFsSize = (cxi->ncch.exeFsSize - 1) * 0x200;
@@ -329,12 +292,8 @@ bool decryptExeFs(Cxi *cxi){
     aes_use_keyslot(0x2C);
     aes(cxi, exeFsOffset, exeFsSize / AES_BLOCK_SIZE, ncchCtr, AES_CTR_MODE, AES_INPUT_BE | AES_INPUT_NORMAL);
     
-    return memcmp(cxi, "FIRM", 4) == 0;
+    return memcmp(cxi, "FIRM", 4) == 0 ? exeFsSize : 0;
 }
-
-const u8 memeKey[0x10] = { //Megumin best girl, fite me Rei.
-    0x52, 0x65, 0x69, 0x20, 0x69, 0x73, 0x20, 0x62, 0x65, 0x73, 0x74, 0x20, 0x67, 0x69, 0x72, 0x6C
-};
 
 void initKeyslot11(void){
     ALIGNED(4) static u8 shasum[SHA_256_HASH_SIZE];
@@ -360,18 +319,21 @@ void checkKeyHash(u8* key1, u8* key2){
     sha(computed_key1, key1, 0x10, SHA_256_MODE);
     sha(computed_key2, key2, 0x10, SHA_256_MODE);
     
-    int ret = 0;
-    
-    ret += memcmp(key1_hash, computed_key1, SHA_256_HASH_SIZE);
-    ret += memcmp(key2_hash, computed_key2, SHA_256_HASH_SIZE);
-    
-    if(ret != 0){
-        debugWrite("/rei/debug.log", "Secret Sector is corrupted. ", 29);
-        shutdown();
-    }
+    memcmp(key1_hash, computed_key1, SHA_256_HASH_SIZE);
+    memcmp(key2_hash, computed_key2, SHA_256_HASH_SIZE);
 }
 
-//Emulates the K9L process and then some
+u32 decAtoi(const char *in, u32 digits){
+    u32 res = 0;
+    char *tmp = (char*)in;
+
+    for(u32 i = 0; i < digits && *tmp != 0; tmp++, i++)
+        res = *tmp - '0' + res * 10;
+
+    return res;
+}
+
+//Emulates the K9L process and then some.
 void k9loader(Arm9Bin* sect_arm9){
     u32 k9lVer = 0;
     
@@ -444,12 +406,4 @@ void k9loader(Arm9Bin* sect_arm9){
         debugWrite("/rei/debugCrypto.log", "Failed to decrypt arm9 binary... ", 33);
         shutdown();
     }
-}
-
-//Decrypt firmware blob
-void decryptFirm(void *firm, Size firmSize){
-    u8 firmIV[0x10] = {0};
-    aes_setkey(0x16, memeKey, AES_KEYNORMAL, AES_INPUT_BE | AES_INPUT_NORMAL);
-    aes_use_keyslot(0x16);
-    aes(firm, firm, firmSize / AES_BLOCK_SIZE, firmIV, AES_CBC_DECRYPT_MODE, AES_INPUT_BE | AES_INPUT_NORMAL);
 }

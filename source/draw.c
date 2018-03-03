@@ -13,7 +13,7 @@ void loadSplash(void){
     //Initialize screens.
     initScreen();
     //If FB was clear, and the image exists, display
-    clearScreen();
+    //clearScreen();
     if(fopen("/rei/top_splash.bin", "rb")){
         fread(fbs->top_left, 1, fsize());
         fclose();

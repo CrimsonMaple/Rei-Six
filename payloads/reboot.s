@@ -39,6 +39,7 @@ low_tid_addr                    equ (copy_launch_stub_stack_bottom - 0x300)
 firm_addr                       equ 0x20001000
 firm_maxsize                    equ 0x07FFF000
 
+arm11_entrypoint_addr           equ 0x1FFFFFFC
 .create "build/reboot.bin", 0
 .arm
     ; Interesting registers and locations to keep in mind, set just before this code is ran:
@@ -181,14 +182,18 @@ fname: .ascii "FILE"
         add r5, #1
         cmp r5, #4
         blo load_section_loop
-
+    
+    ldr r0, =arm11_entrypoint_addr
+    ldr r1, [r4, #0x08]
+    str r1, [r0]    
+    
     mov r0, #2 ; argc
     ldr r1, =argv_addr ; argv
     ldr r2, =0xBABE    ; magic word
 
-    mov r5, #0x20000000
+    ldr r5, =arm11_entrypoint_addr
     ldr r6, [r4, #0x08]
-    str r6, [r5, #-4]   ; store arm11 entrypoint
+    str r6, [r5]   ; store arm11 entrypoint
 
     ldr lr, [r4, #0x0c]
     bx lr
