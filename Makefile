@@ -75,7 +75,7 @@ $(dir_out)/rei/: $(dir_common)/top_splash.bin $(dir_common)/bottom_splash.bin
 
 $(dir_out)/rei/patches/patches.dat: $(wildcard common/patches/*.rnp)
 	@mkdir -p "$(@D)"
-	cat $< > $@
+	cat $^ > $@
 
 $(dir_out)/rei/loader.cxi: $(dir_loader) $(dir_out)/rei $(dir_out)/rei/patches/patches.dat
 	@$(MAKE) $(FLAGS) -C $(dir_loader)
