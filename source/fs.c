@@ -63,6 +63,14 @@ Size fsize(void){
     return f_size(&fp);
 }
 
+u32 fstat(const void *filename){
+    FILINFO info;
+    if(f_stat(filename, &info) != FR_OK)
+        return 0;
+    else
+        return 1;
+}
+
 Size fwrite(const void *buffer, Size elementSize, Size elementCnt){
     UINT br;
     if(f_write(&fp, buffer, elementSize*elementCnt, &br)) return 0;

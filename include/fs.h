@@ -21,8 +21,8 @@ u8 eof(void);
 Size fsize(void);
 Size fwrite(const void *buffer, Size elementSize, Size elementCnt);
 Size fread(const void *buffer, Size elementSize, Size elementCnt);
+u32 fstat(const void *filename);
 
-//char read_firmware(u8 *dest, u32 firm);
 void debugWrite(const char *filename, char *buffer, Size size);
 void shutdown(void);
 

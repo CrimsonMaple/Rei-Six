@@ -13,6 +13,8 @@ You'll need armips and firmtool added to your Path.
 
 Copy everything in 'out' folder to SD root and run!
 
+
+
 **Recommended Setup and Instructions:**
 
 EmuNand users now have to get their own firmware files. There will be instructions in this "guide" to do this.
@@ -55,20 +57,11 @@ You can also set other boot slots to other payloads like GodMode9.
 
 Now with Rei-Six 1.2 firmware files are no longer in the release zip.
 
-You have to get them yourself. Here I will show you how.
-Launch Decrypt9WIP using any method.
+You have to get them yourself. Using this script linked here: [DOWNLOAD](https://gbatemp.net/attachments/rei-six-firm-ripper-7z.118755/)
 
-Go to "SysNAND options -> Miscellaneous... -> NCCH FIRMs Dump"
+Run said script in GodMode9 and the firms will automatically be placed in your "/rei" folder.
 
-This will dump the 3ds firmware to your SD for your 3ds.
-Take the resulting binary files and rename them to:
-
-NATIVE_FIRM -> "native_firmware.bin"
-TWL_FIRM -> "twl_firmware.bin"
-AGB_FIRM -> "agb_firmware.bin"
-
-Throw the renamed bin files into "/rei" on your SD card, and you are good to go!
-Maybe someone can make a script to automate this. *shrug*
+To launch EmuNand hold "R" on startup or have a file named "loademunand" with no file extension in your "/rei" folder.
 
 **Features:**
 

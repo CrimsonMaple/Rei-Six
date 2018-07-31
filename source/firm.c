@@ -27,6 +27,7 @@ Size firmSize = 0;
 //Patch vars
 uPtr firmWriteOffset = 0,
      ldrOffset = 0;
+u32  chkldrExist = 0;
      
 static __attribute__((noinline)) bool overlaps(u32 as, u32 ae, u32 bs, u32 be){
     if(as <= bs && bs <= ae)
@@ -153,7 +154,9 @@ void patchFirm(firmtype firm_type, boottype boot_type, u16 path[]){
         }
         
         //Inject custom loader if exists
-        if(fopen("/rei/loader.cxi", "rb")){
+        chkldrExist = fstat("/rei/loader.cxi");
+        if(chkldrExist){
+            fopen("/rei/loader.cxi", "rb");
             u8 *arm11SysMods = (u8*)firm + firm->section[0].offset;
             Size ldrInFirmSize;
             Size ldrFileSize = fsize();
@@ -162,8 +165,6 @@ void patchFirm(firmtype firm_type, boottype boot_type, u16 path[]){
             fread(firm->section[0].address + ldrOffset, 1, ldrFileSize);
             memcpy(firm->section[0].address + ldrOffset + ldrFileSize, arm11SysMods + ldrOffset + ldrInFirmSize, firm->section[0].size - (ldrOffset + ldrInFirmSize));
             fclose();
-        } else {
-            memcpy(firm->section[0].address, firm + firm->section[0].offset, firm->section[0].size);
         }
         
         u8 *offset_p9 = getProcess9Info(sect_arm9, firm->section[2].size, &size_p9, &addr_p9);
@@ -224,7 +225,7 @@ void patchFirm(firmtype firm_type, boottype boot_type, u16 path[]){
 
 void launchFirm(firmtype firm_type, bool firmLaunch){
     u32 sectionNumber;
-    if (firm_type == NATIVE_FIRM)
+    if (firm_type == NATIVE_FIRM && chkldrExist != 0)
         sectionNumber = 1;
     else
         sectionNumber = 0;
