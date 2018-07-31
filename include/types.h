@@ -49,7 +49,7 @@
 // FIRM Paths
 #define o3ds_native_firm    "1:/title/00040138/00000002/content/00000064.app"
 #define n3ds_native_firm    "1:/title/00040138/20000002/content/00000035.app"
-#define o3ds_twl_firm       "1:/title/00040138/00000102/content/0000001f.app"
+#define o3ds_twl_firm       "1:/title/00040138/00000102/content/00000018.app"
 #define n3ds_twl_firm       "1:/title/00040138/20000102/content/00000004.app"
 #define o3ds_agb_firm       "1:/title/00040138/00000202/content/0000000b.app"
 #define n3ds_agb_firm       "1:/title/00040138/20000202/content/00000000.app"
